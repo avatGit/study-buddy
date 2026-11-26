@@ -38,7 +38,7 @@ Each module may contain routes, controller, service, model/schema, validation an
 }
 ```
 
-Common errors: `400 MALFORMED_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND` (also use for out-of-scope objects to avoid disclosure), `409 CONFLICT`, and `422 VALIDATION_ERROR` or a domain-specific rule error. Do not leak stack traces, tokens, password hashes or private data.
+Common errors: `400 MALFORMED_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOUND` (also use for out-of-scope objects to avoid disclosure), `409 CONFLICT`, and `422 VALIDATION_ERROR` or a domain-specific rule error. Error responses and logs must not contain credentials, tokens, password hashes or private data. Successful authentication responses return the tokens specified below over HTTPS.
 
 ## Authentication routes
 
@@ -48,6 +48,16 @@ Common errors: `400 MALFORMED_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, 
 | POST `/api/auth/login`    | Public              |     200 | 400 malformed body, 401 invalid credentials, 422 invalid field format. Use a generic credential error.                            |
 | POST `/api/auth/refresh`  | Valid refresh token |     200 | 400 malformed body, 401 expired, revoked, invalid or reused token. Rotate refresh tokens and store only their hashes server-side. |
 | POST `/api/auth/logout`   | Authenticated user  |     204 | 401 missing/invalid access token. Revoke the current refresh-token session; repeated logout is idempotent.                        |
+
+Authentication request and response bodies:
+
+- Registration and login accept `{ "email": "...", "password": "..." }`. Email is trimmed and normalized to lowercase. Passwords must contain 8–128 characters.
+- Registration returns `201`; login returns `200`. Both return `{ "user": { "id": "...", "email": "...", "role": "USER" }, "accessToken": "...", "refreshToken": "..." }`. `role` always comes from the stored user; registration ignores a client-supplied role.
+- Refresh accepts `{ "refreshToken": "..." }`, returns `200` with the same response shape, and rotates both tokens. Missing/invalid request fields return `422`; invalid credentials or refresh tokens return `401 UNAUTHENTICATED`. Duplicate email returns `409 CONFLICT`.
+- Logout requires an access-token Bearer header, accepts no request body and returns `204`. It revokes that token's refresh-token session; repeating logout is idempotent.
+- Access tokens are short-lived HS256 JWTs signed with `ACCESS_TOKEN_SECRET`. Claims are `sub` (user ID), `sid` (session ID), `role`, `iat` and `exp`; lifetime is configured by `ACCESS_TOKEN_TTL`.
+- Refresh tokens are 32-byte cryptographically random opaque values, returned to Flutter over HTTPS and stored by the client in secure storage. MongoDB stores only their SHA-256 hashes in one `authSessions` document per session. Refresh uses an atomic compare-and-swap on the stored hash and expiration, so only one concurrent use of a token can rotate successfully. Rotated or revoked tokens return `401 UNAUTHENTICATED`. Session expiration is extended by `REFRESH_TOKEN_TTL_DAYS` on rotation.
+- Passwords are hashed with Argon2id. User email has a unique database index; the public registration role is always `USER`.
 
 ## Route catalogue
 
@@ -106,9 +116,9 @@ The GET/PATCH/DELETE tutor-profile and availability routes marked as recommended
 
 ## Data model summary
 
-Collections: `universities`, `users`, `tutorProfiles`, `subjects`, `recurringAvailabilities`, `availabilityExceptions`, `sessionRequests`, `sessions`, `disputes`, `reviews`, `notifications`. Use ObjectId references for independently queried/lifecycle-managed entities; embed only small stable display snapshots. Store timestamps as BSON Date in UTC. Keep server-owned fields (passwordHash, role, statuses, aggregates) out of client write DTOs.
+Collections: `universities`, `users`, `authSessions`, `tutorProfiles`, `subjects`, `recurringAvailabilities`, `availabilityExceptions`, `sessionRequests`, `sessions`, `disputes`, `reviews`, `notifications`. Use ObjectId references for independently queried/lifecycle-managed entities; embed only small stable display snapshots. Store timestamps as BSON Date in UTC. Keep server-owned fields (passwordHash, role, statuses, aggregates) out of client write DTOs.
 
-Important unique indexes: `users.email`, `tutorProfiles.userId`, `sessions.requestId`, `reviews.sessionId`; at most one OPEN dispute per session via partial unique index or equivalent service-level serialized check. Search indexes cover university/status/subject for tutors, participant/status/date for requests and sessions, and recipient/read/date for notifications. A unique index cannot enforce arbitrary time-range overlap.
+Important unique indexes: `users.email`, `authSessions.refreshTokenHash`, `tutorProfiles.userId`, `sessions.requestId`, `reviews.sessionId`; `authSessions.expiresAt` has a TTL index. At most one OPEN dispute per session via partial unique index or equivalent service-level serialized check. Search indexes cover university/status/subject for tutors, participant/status/date for requests and sessions, and recipient/read/date for notifications. A unique index cannot enforce arbitrary time-range overlap.
 
 ## Domain invariants and transactions
 
