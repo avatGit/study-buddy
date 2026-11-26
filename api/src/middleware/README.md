@@ -1,0 +1,1 @@
+Shared middleware belongs here: authentication, authorization, request validation, rate limiting, request IDs and the final error handler. Enforce resource ownership in services as well as route guards.

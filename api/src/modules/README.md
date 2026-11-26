@@ -1,0 +1,1 @@
+Create one folder per resource or closely related feature. Keep route definitions thin, controllers focused on HTTP, services responsible for business rules, and Mongoose schemas/models responsible for persistence.
