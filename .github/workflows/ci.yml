@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   api:
-    name: API typecheck, build and tests
+    name: API lint, typecheck, build and tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: 24
       - run: npm install
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
