@@ -1,8 +1,9 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { testConfig } from './helpers/test-config.js';
 
-const app = createApp();
+const app = createApp(testConfig);
 
 describe('API application', () => {
   it('returns a healthy response from GET /health', async () => {

@@ -1,0 +1,31 @@
+@baseUrl = http://localhost:3000/api
+
+### Inscription d'un nouvel utilisateur
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "UnMotDePasseSolide123!"
+}
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "UnMotDePasseSolide123!"
+}
+
+### Test refresh token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "`PASTE REFRESH_TOKEN"
+}
+
+### Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer `PASTE ACCESS_TOKEN`

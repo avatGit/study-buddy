@@ -6,10 +6,9 @@ import { ApiError } from './common/api-error.js';
 import { requestLogger } from './common/logger.js';
 import type { Environment } from './config/env.js';
 import { createErrorHandler } from './middleware/error-handler.js';
+import { createAuthRouter } from './modules/auth/auth.routes.js';
 
-type AppConfig = Pick<Environment, 'CLIENT_ORIGIN' | 'NODE_ENV'>;
-
-export function createApp(config: AppConfig = defaultAppConfig()): Express {
+export function createApp(config: Environment): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(requestLogger);
@@ -28,21 +27,11 @@ export function createApp(config: AppConfig = defaultAppConfig()): Express {
     }),
   );
   app.use(express.json({ limit: '1mb' }));
+  app.use('/api/auth', createAuthRouter(config));
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
   app.use((_req, _res, next) => {
     next(new ApiError(404, 'NOT_FOUND', 'The requested resource was not found.'));
   });
   app.use(createErrorHandler(config.NODE_ENV));
   return app;
-}
-
-function defaultAppConfig(): AppConfig {
-  const nodeEnvironment = process.env.NODE_ENV;
-  return {
-    CLIENT_ORIGIN: process.env.CLIENT_ORIGIN ?? 'http://localhost:3000',
-    NODE_ENV:
-      nodeEnvironment === 'test' || nodeEnvironment === 'production'
-        ? nodeEnvironment
-        : 'development',
-  };
 }
