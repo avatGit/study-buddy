@@ -7,6 +7,7 @@ import { requestLogger } from './common/logger.js';
 import type { Environment } from './config/env.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
+import { createTutorRouter } from './modules/tutors/tutor.routes.js';
 
 export function createApp(config: Environment): Express {
   const app = express();
@@ -28,6 +29,7 @@ export function createApp(config: Environment): Express {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use('/api/auth', createAuthRouter(config));
+  app.use('/api/tutors', createTutorRouter(config));
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
   app.use((_req, _res, next) => {
     next(new ApiError(404, 'NOT_FOUND', 'The requested resource was not found.'));
