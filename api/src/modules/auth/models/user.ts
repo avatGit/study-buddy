@@ -1,4 +1,4 @@
-import mongoose, { Schema, type Model } from 'mongoose';
+import mongoose, { Schema, Types, type Model } from 'mongoose';
 
 export type UserRole = 'USER' | 'ADMIN';
 
@@ -6,6 +6,7 @@ export interface UserFields {
   email: string;
   passwordHash: string;
   role: UserRole;
+  universityId?: Types.ObjectId | null;
 }
 
 const userSchema = new Schema<UserFields>(
@@ -27,6 +28,11 @@ const userSchema = new Schema<UserFields>(
       enum: ['USER', 'ADMIN'],
       default: 'USER',
       required: true,
+    },
+    universityId: {
+      type: Schema.Types.ObjectId,
+      ref: 'University',
+      default: null,
     },
   },
   {
