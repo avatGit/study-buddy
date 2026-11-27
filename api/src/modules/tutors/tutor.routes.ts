@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import type { Environment } from '../../config/env.js';
 import {
+  deleteOwnAvailabilityException,
+  getOwnAvailabilityExceptions,
+  patchOwnAvailabilityException,
+  postOwnAvailabilityException,
+} from '../availability/availability.controller.js';
+import {
   deleteOwnTutorAvailability,
   getOwnTutorAvailabilities,
   getOwnTutorProfile,
@@ -25,6 +31,10 @@ export function createTutorRouter(config: Environment): Router {
   router.post('/me/availabilities', postOwnTutorAvailability);
   router.patch('/me/availabilities/:availabilityId', patchOwnTutorAvailability);
   router.delete('/me/availabilities/:availabilityId', deleteOwnTutorAvailability);
+  router.get('/me/exceptions', getOwnAvailabilityExceptions);
+  router.post('/me/exceptions', postOwnAvailabilityException);
+  router.patch('/me/exceptions/:exceptionId', patchOwnAvailabilityException);
+  router.delete('/me/exceptions/:exceptionId', deleteOwnAvailabilityException);
   router.post('/me/publish', publishOwnTutorProfile);
   router.post('/me/unpublish', unpublishOwnTutorProfile);
   router.get('/:id', getPublicTutorProfileHandler);

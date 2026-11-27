@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { loadEnvironment, type Environment } from '../src/config/env.js';
+import { AvailabilityException } from '../src/modules/availability/models/availability-exception.js';
 import { RecurringAvailability } from '../src/modules/availability/models/recurring-availability.js';
 import { AuthSession } from '../src/modules/auth/models/auth-session.js';
 import { User } from '../src/modules/auth/models/user.js';
@@ -47,6 +48,7 @@ describe('tutor profile API', () => {
       Subject.init(),
       TutorProfile.init(),
       RecurringAvailability.init(),
+      AvailabilityException.init(),
     ]);
   }, 120_000);
 
@@ -58,6 +60,7 @@ describe('tutor profile API', () => {
       Subject.deleteMany({}),
       TutorProfile.deleteMany({}),
       RecurringAvailability.deleteMany({}),
+      AvailabilityException.deleteMany({}),
     ]);
     requestApp = createApp(config);
   });
@@ -131,6 +134,20 @@ describe('tutor profile API', () => {
     expect(subjectResponse.status).toBe(200);
     expect((await addAvailability(token)).status).toBe(201);
     return id;
+  }
+
+  function localDateOffset(offsetDays: number, timeZone = 'Pacific/Kiritimati'): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const values = new Map(parts.map(({ type, value }) => [type, value]));
+    const today = `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
+    const result = new Date(`${today}T00:00:00.000Z`);
+    result.setUTCDate(result.getUTCDate() + offsetDays);
+    return result.toISOString().slice(0, 10);
   }
 
   it('creates and reads a private draft profile, then updates it for its owner only', async () => {
@@ -654,5 +671,234 @@ describe('tutor profile API', () => {
       .send({ displayName: 'Admin tutor', bio: '' });
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('creates, lists, updates and deletes only the authenticated tutor’s exceptions', async () => {
+    const owner = await createAccount();
+    const otherOwner = await createAccount();
+    const ownerProfile = await createProfile(owner.token);
+    const otherProfile = await createProfile(otherOwner.token);
+    const date = localDateOffset(2);
+    const blockDay = {
+      date,
+      kind: 'BLOCK_DAY',
+      timeZone: 'Pacific/Kiritimati',
+    };
+
+    expect((await request(requestApp).get('/api/tutors/me/exceptions')).status).toBe(401);
+    const empty = await request(requestApp)
+      .get('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ items: [] });
+
+    const created = await request(requestApp)
+      .post('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send(blockDay);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      id: expect.any(String),
+      ...blockDay,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
+    expect(created.body).not.toHaveProperty('startTime');
+    expect(created.body).not.toHaveProperty('endTime');
+    expect(created.body).not.toHaveProperty('tutorProfileId');
+    expect(JSON.stringify(created.body)).not.toContain(owner.userId);
+    expect((await AvailabilityException.findById(created.body.id))?.tutorProfileId.toString()).toBe(
+      ownerProfile.id,
+    );
+
+    const otherList = await request(requestApp)
+      .get('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${otherOwner.token}`);
+    expect(otherList.status).toBe(200);
+    expect(otherList.body).toEqual({ items: [] });
+
+    const otherCannotPatch = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${created.body.id as string}`)
+      .set('Authorization', `Bearer ${otherOwner.token}`)
+      .send({ date: localDateOffset(3) });
+    expect(otherCannotPatch.status).toBe(404);
+    expect(otherCannotPatch.body.error).toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+      details: [],
+    });
+    const otherCannotDelete = await request(requestApp)
+      .delete(`/api/tutors/me/exceptions/${created.body.id as string}`)
+      .set('Authorization', `Bearer ${otherOwner.token}`);
+    expect(otherCannotDelete.status).toBe(404);
+    expect(otherProfile.id).not.toBe(ownerProfile.id);
+
+    const updated = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${created.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ date: localDateOffset(3) });
+    expect(updated.status).toBe(200);
+    expect(updated.body.date).toBe(localDateOffset(3));
+
+    const deleted = await request(requestApp)
+      .delete(`/api/tutors/me/exceptions/${created.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(deleted.status).toBe(204);
+    const repeatedDelete = await request(requestApp)
+      .delete(`/api/tutors/me/exceptions/${created.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(repeatedDelete.status).toBe(404);
+  });
+
+  it('validates exception fields, merged updates and local dates while allowing overlapping blocks', async () => {
+    const owner = await createAccount();
+    await createProfile(owner.token);
+    const date = localDateOffset(2);
+    const timeZone = 'Pacific/Kiritimati';
+    const invalidRequests = [
+      { date, kind: 'BLOCK_DAY', timeZone, startTime: '09:00' },
+      { date, kind: 'BLOCK_TIME', timeZone, startTime: '09:00' },
+      { date, kind: 'BLOCK_TIME', timeZone, startTime: '11:00', endTime: '10:00' },
+      { date, kind: 'BLOCK_TIME', timeZone, startTime: '23:00', endTime: '01:00' },
+      { date, kind: 'BLOCK_TIME', timeZone, startTime: '9:00', endTime: '10:00' },
+      { date, kind: 'BLOCK_TIME', timeZone: 'Not/A_Timezone', startTime: '09:00', endTime: '10:00' },
+      { date: '2025-02-30', kind: 'BLOCK_DAY', timeZone },
+      { date: 'not-a-date', kind: 'BLOCK_DAY', timeZone },
+      { date: localDateOffset(-2, timeZone), kind: 'BLOCK_DAY', timeZone },
+      { date: localDateOffset(-2, timeZone), kind: 'BLOCK_TIME', timeZone, startTime: '09:00', endTime: '10:00' },
+      { date, kind: 'OTHER', timeZone },
+      { ...{ date, kind: 'BLOCK_DAY', timeZone }, tutorProfileId: new Types.ObjectId().toString() },
+    ];
+
+    for (const body of invalidRequests) {
+      const response = await request(requestApp)
+        .post('/api/tutors/me/exceptions')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send(body);
+      expect(response.status).toBe(422);
+      expect(response.body.error).toMatchObject({
+        code: 'VALIDATION_ERROR',
+        status: 422,
+      });
+    }
+
+    const first = await request(requestApp)
+      .post('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ date, kind: 'BLOCK_TIME', timeZone, startTime: '09:00', endTime: '11:00' });
+    const overlapping = await request(requestApp)
+      .post('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ date, kind: 'BLOCK_TIME', timeZone, startTime: '10:00', endTime: '12:00' });
+    expect(first.status).toBe(201);
+    expect(overlapping.status).toBe(201);
+
+    const invalidMergedTime = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ endTime: '08:00' });
+    expect(invalidMergedTime.status).toBe(422);
+    const invalidMergedDate = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ date: localDateOffset(-2, timeZone) });
+    expect(invalidMergedDate.status).toBe(422);
+
+    const changedToDay = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ kind: 'BLOCK_DAY' });
+    expect(changedToDay.status).toBe(200);
+    expect(changedToDay.body.kind).toBe('BLOCK_DAY');
+    expect(changedToDay.body).not.toHaveProperty('startTime');
+    expect(changedToDay.body).not.toHaveProperty('endTime');
+
+    const invalidDayTime = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ startTime: '09:00' });
+    expect(invalidDayTime.status).toBe(422);
+    const incompleteKindChange = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ kind: 'BLOCK_TIME' });
+    expect(incompleteKindChange.status).toBe(422);
+
+    const changedToTime = await request(requestApp)
+      .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ kind: 'BLOCK_TIME', startTime: '12:00', endTime: '13:00' });
+    expect(changedToTime.status).toBe(200);
+    expect(changedToTime.body).toMatchObject({
+      kind: 'BLOCK_TIME',
+      startTime: '12:00',
+      endTime: '13:00',
+    });
+    expect(
+      (await request(requestApp)
+        .patch(`/api/tutors/me/exceptions/${first.body.id as string}`)
+        .set('Authorization', `Bearer ${owner.token}`)
+        .send({})).status,
+    ).toBe(422);
+
+    const list = await request(requestApp)
+      .get('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(list.status).toBe(200);
+    expect(list.body.items).toHaveLength(2);
+    expect(list.body.items.map((item: { id: string }) => item.id)).toEqual([
+      overlapping.body.id,
+      first.body.id,
+    ]);
+  });
+
+  it('keeps exceptions separate from recurring availability and publication requirements', async () => {
+    const owner = await createAccount();
+    await createProfile(owner.token, { bio: 'A tutor biography' });
+    const subjectId = await createSubject({ name: 'Algebra' });
+    const subjects = await request(requestApp)
+      .put('/api/tutors/me/subjects')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ subjectIds: [subjectId.toString()] });
+    expect(subjects.status).toBe(200);
+
+    const date = localDateOffset(2);
+    const exception = await request(requestApp)
+      .post('/api/tutors/me/exceptions')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({
+        date,
+        kind: 'BLOCK_TIME',
+        timeZone: 'Pacific/Kiritimati',
+        startTime: '09:00',
+        endTime: '11:00',
+      });
+    expect(exception.status).toBe(201);
+
+    const cannotPublishWithExceptionOnly = await request(requestApp)
+      .post('/api/tutors/me/publish')
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(cannotPublishWithExceptionOnly.status).toBe(422);
+    expect(cannotPublishWithExceptionOnly.body.error.details).toContainEqual(
+      expect.objectContaining({ path: 'availabilities' }),
+    );
+    expect(await RecurringAvailability.countDocuments()).toBe(0);
+
+    const recurring = await addAvailability(owner.token);
+    expect(recurring.status).toBe(201);
+    const published = await request(requestApp)
+      .post('/api/tutors/me/publish')
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(published.status).toBe(200);
+
+    const availabilityList = await request(requestApp)
+      .get('/api/tutors/me/availabilities')
+      .set('Authorization', `Bearer ${owner.token}`);
+    expect(availabilityList.status).toBe(200);
+    expect(availabilityList.body.items).toEqual([
+      expect.objectContaining(mondayWindow),
+    ]);
+    expect(await RecurringAvailability.countDocuments()).toBe(1);
+    expect(await AvailabilityException.countDocuments()).toBe(1);
   });
 });
