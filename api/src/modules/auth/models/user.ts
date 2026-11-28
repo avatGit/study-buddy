@@ -3,6 +3,7 @@ import mongoose, { Schema, Types, type Model } from 'mongoose';
 export type UserRole = 'USER' | 'ADMIN';
 
 export interface UserFields {
+  fullName?: string | null;
   email: string;
   passwordHash: string;
   role: UserRole;
@@ -11,6 +12,11 @@ export interface UserFields {
 
 const userSchema = new Schema<UserFields>(
   {
+    fullName: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
     email: {
       type: String,
       required: true,

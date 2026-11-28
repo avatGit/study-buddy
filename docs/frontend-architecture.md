@@ -2,7 +2,7 @@
 
 ## Purpose and stack
 
-This document defines the Flutter V1 structure and integration conventions. The app serves learners and tutors. Admin dispute-management screens are included only if the team confirms the administrator will use the mobile app; otherwise the admin API can be operated by a future protected admin client. The backend remains the source of truth for permissions, statuses, ratings and university scope.
+This document defines the Flutter V1 structure and integration conventions. The app serves learners and tutors. Admins use the same login API in a future admin interface; no admin dashboard or student-facing Admin link is part of this work. The initial admin client may use this Flutter project with responsive web support; choosing a separate web frontend is a later architectural decision. The backend remains the source of truth for permissions, statuses, ratings and university scope.
 
 Use Flutter with Dart, feature-first organization, BLoC/Cubit for state management, a declarative router, Dio (or the selected HTTP client), JSON serialization, and secure platform storage for refresh credentials. Confirm exact package versions in `pubspec.yaml` and the course guide before implementation.
 
@@ -32,7 +32,7 @@ Feature flow: **Page/Widgets -> BLoC/Cubit -> Repository contract -> Repository 
 
 | Feature              | BLoC/Cubit                                  | Main responsibility                                                                  |
 | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Authentication       | `AuthBloc`                                  | Register, login, restore session, refresh credentials, logout.                       |
+| Authentication       | `AuthCubit`                                 | Register, login, restore session, refresh credentials, reload current user, logout.  |
 | Home                 | `HomeCubit`                                 | Load upcoming sessions, shortcuts and notification count from existing repositories. |
 | Tutor discovery      | `TutorSearchBloc`                           | Search, filters, pagination, retry and empty results.                                |
 | Public tutor profile | `TutorProfileCubit`                         | Load public tutor data, availability, reviews and aggregate rating.                  |
@@ -50,19 +50,24 @@ Avoid a global BLoC for unrelated feature state. Reuse shared auth/session state
 ## Navigation map
 
 ```text
-Startup -> Auth check -> Sign in / Register
-                         -> Home
-Home -> Tutor Search -> Tutor Profile -> Session Request -> My Requests -> Request Detail
-Home -> My Sessions -> Session Detail -> Cancel / Report or dispute / Review when eligible
-Home -> Notifications -> Related Request or Session
-Home -> Tutor Space -> Profile Editor -> Subjects -> Availability -> Preview -> Publish
+Startup -> refresh-token restore -> Sign in / Register
+                                   -> Home tab
+Home tab -> nested destinations (when implemented): Tutor Search -> Tutor Profile -> Session Request
+Search tab -> tutor discovery and nested tutor/profile flows
+My Sessions tab -> session list and nested session detail/actions
+Profile tab -> current-user profile, reload, and sign out
+Tutor profile -> nested Tutor Space -> Profile Editor -> Subjects -> Availability -> Preview -> Publish
 ```
 
-Tutor functions are enabled for a user who has a tutor profile. Navigation guards improve UX but do not replace API authorization. Admin route area is role-gated and conditional on the team deciding to build it in the mobile app.
+The only top-level destinations are **Home**, **Search**, **My Sessions**, and **Profile**. Other destinations are nested flows, not additional tabs. The current app implements the four-tab shell and onboarding/profile entry points; the unimplemented session, notification, tutor-editor, and nested detail screens remain future work. Tutor functions are enabled for a user who has a tutor profile. Navigation guards improve UX but do not replace API authorization. No admin destination is exposed in student authentication or navigation.
 
 ## API integration
 
-Use base URL configuration per environment. The Dio interceptor adds the short-lived bearer access token, refreshes through `POST /api/auth/refresh` when appropriate, and retries a request at most once. Prevent simultaneous refresh races. Store refresh credentials only in platform secure storage. Logout calls `POST /api/auth/logout`, clears local credentials even if the server call fails, and returns to sign-in.
+Use `API_BASE_URL` for environment-specific base URL configuration. The Dio interceptor adds the short-lived bearer access token. Concurrent `401` responses share one refresh future; the client calls `POST /api/auth/refresh` outside the authenticated interceptor, securely stores both rotated tokens before retrying, and retries each eligible request at most once. Login, registration, and refresh requests are never recursively refreshed. A failed refresh clears stored credentials and transitions to sign-in once. Store access and refresh credentials together in platform secure storage; never log them.
+
+On startup, restore a stored session by rotating its refresh token. Persist the returned access/refresh tokens in secure storage and place the returned user in the in-memory authenticated state; do not call `/api/users/me` again during that restore. Use authenticated `GET /api/users/me` only when explicitly reloading the current profile. Registration requires a trimmed `fullName` (1–120 characters), email and password, and may submit an optional `universityId` selected from the complete paginated public `GET /api/universities` catalogue; university names are never free-text input. Missing `fullName` on legacy accounts is represented as `null`, not inferred from email. Public registration cannot set `ADMIN`.
+
+The “Forgot password?” action is visible only as disabled “Coming soon” UI. Password recovery and its API contract are deferred until email delivery and a secure reset-token flow are available; see [`frontend-api-needs.md`](frontend-api-needs.md).
 
 Map the backend error envelope `{ error: { code, message, status, details } }` into typed app failures. Handle `401` by refreshing once then signing out, `403` as forbidden, `404` as unavailable/out of scope, `409 SLOT_CONFLICT` as a slot-selection conflict, `422` as field/domain validation, and network/5xx as retryable where safe. Never display raw stack traces or assume a button being hidden grants permission.
 
@@ -74,17 +79,15 @@ Cache the main tutor search list with explicit invalidation after filter changes
 
 ## Core endpoint integration map
 
-| App feature          | API endpoints                                                                                                                                                      |
+| App feature          | Implemented API endpoints used by this flow                                                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Auth                 | `POST /api/auth/register`, `/login`, `/refresh`, `/logout`                                                                                                         |
-| Tutor search/profile | `GET /api/subjects`, `GET /api/tutors`, `GET /api/tutors/:id`, `GET /api/tutors/:id/reviews`                                                                       |
-| Tutor profile setup  | `GET/PUT /api/tutors/me/profile`, `/subjects`, `/availabilities`, `/exceptions`, `/publish`, `/unpublish`                                                          |
-| Requests             | `POST/GET /api/session-requests`, `GET /api/session-requests/:id`, action routes `/accept`, `/reject`, `/counter-proposals`, `/accept-counter-proposal`, `/cancel` |
-| Sessions             | `GET /api/sessions`, `GET /api/sessions/:id`, action routes `/cancel`, `/complete`, `/disputes`, `/reviews`                                                        |
-| Notifications        | `GET /api/notifications`, `PATCH /api/notifications/:id/read`                                                                                                      |
-| Admin disputes       | `GET /api/admin/disputes`, `GET /api/admin/disputes/:id`, `POST /api/admin/disputes/:id/resolve`                                                                   |
+| Auth/onboarding      | `POST /api/auth/register`, `/login`, `/refresh`, `/logout`; public `GET /api/universities`; authenticated `GET /api/users/me`                                     |
+| Tutor search/profile | `GET /api/subjects`, `GET /api/tutors`, `GET /api/tutors/:id`                                                                                                      |
+| Tutor profile setup  | `/api/tutors/me/profile`, `/subjects`, `/availabilities`, `/exceptions`, `/publish`, `/unpublish`                                                                  |
 
-Availability GET/PATCH/exception DELETE and own-profile GET routes are proposed contract completions; confirm them with backend before wiring the UI. Use generated or hand-maintained typed DTOs aligned with the final API contract.
+The following V1 endpoint groups remain planned and are not implemented API routes: `/api/session-requests`, `/api/sessions`, `/api/notifications`, tutor reviews, and `/api/admin/*`. The mounted API route inventory and exact contracts are in [`api/openapi.yaml`](../api/openapi.yaml). Availability GET/PATCH/exception DELETE and own-profile GET routes are implemented; use the OpenAPI specification rather than this feature roadmap for the current request/response contract.
+
+Use generated or hand-maintained typed DTOs aligned with the API specification.
 
 ## Testing and acceptance
 

@@ -5,8 +5,16 @@ const credentialsSchema = z.object({
   password: z.string().min(8).max(128),
 });
 
-export const registerSchema = credentialsSchema;
 export const loginSchema = credentialsSchema;
+
+export const registerSchema = credentialsSchema.extend({
+  fullName: z.string().trim().min(1).max(120),
+  universityId: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Expected a valid university ID.')
+    .optional(),
+});
 
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1).max(256),
@@ -15,4 +23,5 @@ export const refreshSchema = z.object({
 export const logoutSchema = z.undefined();
 
 export type Credentials = z.infer<typeof credentialsSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;

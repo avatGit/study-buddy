@@ -13,11 +13,15 @@ export interface AuthClaims {
 }
 
 export interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    role: UserRole;
-  };
+  user: PublicUser;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface PublicUser {
+  id: string;
+  fullName: string | null;
+  email: string;
+  role: UserRole;
+  universityId: string | null;
 }

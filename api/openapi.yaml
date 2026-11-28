@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   description: |
     OpenAPI documentation for routes mounted by the current API implementation only.
-    All routes under /api/subjects and /api/tutors require a Bearer access token,
-    including public tutor reads. University affiliation is optional and self-declared.
+    All routes under /api/subjects and /api/tutors, plus GET /api/users/me, require
+    a Bearer access token, including public tutor reads. University affiliation is optional and self-declared.
     Users with a university see global and same-university records; users without one
     see global records only. Errors use the common {error:{code,message,status,details}}
     envelope; malformed JSON is 400, invalid request data is 422, and unknown routes
@@ -18,6 +18,8 @@ servers:
 tags:
   - name: Health
   - name: Authentication
+  - name: Universities
+  - name: Users
   - name: Subjects
   - name: Tutors
 security: []
@@ -46,14 +48,17 @@ paths:
       tags: [Authentication]
       operationId: register
       summary: Register a USER account
-      description: Public registration always assigns USER. A supplied role is ignored and cannot create an ADMIN.
+      description: |
+        Public registration always assigns USER. A supplied role is ignored and cannot create an ADMIN.
+        fullName is required and trimmed; universityId is optional and must identify an active university.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CredentialsRequest'
+              $ref: '#/components/schemas/RegistrationRequest'
             example:
+              fullName: Taylor Student
               email: learner@example.test
               password: choose-a-local-password
       responses:
@@ -86,7 +91,7 @@ paths:
               $ref: '#/components/schemas/CredentialsRequest'
       responses:
         '200':
-          description: Authenticated user and rotated access/refresh credentials.
+          description: Authenticated user and rotated access/refresh credentials, including the public user fields.
           content:
             application/json:
               schema:
@@ -122,7 +127,7 @@ paths:
                   maxLength: 256
       responses:
         '200':
-          description: New access and refresh tokens issued.
+          description: New access and refresh tokens issued with the current public user fields.
           content:
             application/json:
               schema:
@@ -151,6 +156,68 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/universities:
+    get:
+      tags: [Universities]
+      operationId: listUniversities
+      summary: List active universities for optional self-declared affiliation
+      description: |
+        Returns active universities only, sorted by name ascending then stable ID.
+        Affiliation is optional and self-declared; membership is not verified.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated active university catalogue.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/University'
+              example:
+                items:
+                  - id: '670000000000000000000001'
+                    name: Example University
+                page: 1
+                limit: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/users/me:
+    get:
+      tags: [Users]
+      operationId: getCurrentUser
+      summary: Read the authenticated user's public account profile
+      description: |
+        The user is selected only from the verified access-token subject. The response
+        contains no password hash, refresh token, or internal user fields.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user's public fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+              example:
+                user:
+                  id: '670000000000000000000001'
+                  fullName: Taylor Student
+                  email: taylor@example.test
+                  role: USER
+                  universityId: null
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
   /api/subjects:
     get:
       tags: [Subjects]
@@ -832,28 +899,67 @@ components:
           type: string
           minLength: 8
           maxLength: 128
+    RegistrationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CredentialsRequest'
+        - type: object
+          required: [fullName]
+          properties:
+            fullName:
+              type: string
+              minLength: 1
+              maxLength: 120
+              description: Trimmed, international names supported.
+            universityId:
+              $ref: '#/components/schemas/ObjectId'
     AuthResponse:
       type: object
       required: [user, accessToken, refreshToken]
       properties:
         user:
-          type: object
-          required: [id, email, role]
-          properties:
-            id:
-              $ref: '#/components/schemas/ObjectId'
-            email:
-              type: string
-              format: email
-            role:
-              type: string
-              enum: [USER, ADMIN]
+          $ref: '#/components/schemas/PublicUser'
         accessToken:
           type: string
           description: Short-lived Bearer JWT. Do not log or expose it.
         refreshToken:
           type: string
           description: Opaque rotating token. Store only in secure client storage and do not log it.
+    CurrentUserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/PublicUser'
+    PublicUser:
+      type: object
+      required: [id, fullName, email, role, universityId]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        fullName:
+          type:
+            - string
+            - 'null'
+          maxLength: 120
+          description: Null for legacy accounts without a stored full name.
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [USER, ADMIN]
+        universityId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+    University:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
     Subject:
       type: object
       required: [id, name, universityId]
