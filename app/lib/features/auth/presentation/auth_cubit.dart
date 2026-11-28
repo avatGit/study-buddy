@@ -12,6 +12,8 @@ class AuthCubit extends Cubit<AuthState> {
 
   final AuthRepository _repository;
 
+  Future<List<UniversityOption>> universities() => _repository.universities();
+
   Future<void> restoreSession() async {
     emit(const AuthState.restoring());
     try {

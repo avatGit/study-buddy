@@ -11,6 +11,9 @@ class AppTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffix,
     this.onChanged,
+    this.validator,
+    this.enabled = true,
+    this.autovalidateMode,
     super.key,
   });
 
@@ -23,14 +26,20 @@ class AppTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final Widget? suffix;
   final ValueChanged<String>? onChanged;
+  final FormFieldValidator<String>? validator;
+  final bool enabled;
+  final AutovalidateMode? autovalidateMode;
 
   @override
-  Widget build(BuildContext context) => TextField(
+  Widget build(BuildContext context) => TextFormField(
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         onChanged: onChanged,
+        validator: validator,
+        enabled: enabled,
+        autovalidateMode: autovalidateMode,
         decoration: InputDecoration(
           labelText: label,
           errorText: errorText,
