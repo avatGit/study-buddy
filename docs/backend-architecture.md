@@ -61,6 +61,8 @@ Authentication request and response bodies:
 
 ## Route catalogue
 
+This catalogue records the full V1 API contract and includes routes that are not implemented yet. The currently mounted routes are listed in [`api/openapi.yaml`](../api/openapi.yaml). In this implementation, only `/health`, `/api/auth/*`, `/api/subjects`, and `/api/tutors/*` are mounted; university catalogue, session/request, review, notification, and admin routes below remain planned and must not be treated as available endpoints.
+
 The access column identifies the required role or ownership check. All protected routes also require authentication. Unless specified otherwise, `400`, `401`, `403`, `404`, `409` and `422` may apply according to malformed input, identity, authorization, visibility, state conflict and validation respectively.
 
 | Method and path                                          | Access                          |   Success | Main errors / checks                                                                                                                  |

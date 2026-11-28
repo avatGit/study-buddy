@@ -7,6 +7,8 @@
     "dev": "node --env-file=.env --import tsx --watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "seed:demo": "node --env-file=.env --import tsx src/scripts/seed-demo.ts",
+    "seed:demo:reset": "node --env-file=.env --import tsx src/scripts/seed-demo.ts --reset",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run"
