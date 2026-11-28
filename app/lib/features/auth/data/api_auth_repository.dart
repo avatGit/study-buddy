@@ -21,7 +21,7 @@ class ApiAuthRepository implements AuthRepository {
   Future<StudyUser?> restoreSession() async {
     final refreshToken = await _tokens.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return null;
-    if (!await _client.refreshSession()) return null;
+    if (_tokens.accessToken == null && !await _client.refreshSession()) return null;
     try {
       return await currentUser();
     } on AppFailure catch (failure) {
