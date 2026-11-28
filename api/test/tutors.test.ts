@@ -75,7 +75,7 @@ describe('tutor profile API', () => {
     const email = `tutor${accountNumber}@example.test`;
     const response = await request(requestApp)
       .post('/api/auth/register')
-      .send({ email, password });
+      .send({ fullName: 'Tutor Example', email, password });
     expect(response.status).toBe(201);
     return {
       userId: response.body.user.id as string,

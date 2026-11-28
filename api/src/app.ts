@@ -9,6 +9,8 @@ import { createErrorHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createSubjectRouter } from './modules/subjects/subject.routes.js';
 import { createTutorRouter } from './modules/tutors/tutor.routes.js';
+import { createUniversityRouter } from './modules/universities/university.routes.js';
+import { createUserRouter } from './modules/users/user.routes.js';
 
 export function createApp(config: Environment): Express {
   const app = express();
@@ -32,6 +34,8 @@ export function createApp(config: Environment): Express {
   app.use('/api/auth', createAuthRouter(config));
   app.use('/api/subjects', createSubjectRouter(config));
   app.use('/api/tutors', createTutorRouter(config));
+  app.use('/api/universities', createUniversityRouter());
+  app.use('/api/users', createUserRouter(config));
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
   app.use((_req, _res, next) => {
     next(new ApiError(404, 'NOT_FOUND', 'The requested resource was not found.'));

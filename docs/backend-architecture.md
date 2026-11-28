@@ -51,23 +51,26 @@ Common errors: `400 MALFORMED_REQUEST`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, 
 
 Authentication request and response bodies:
 
-- Registration and login accept `{ "email": "...", "password": "..." }`. Email is trimmed and normalized to lowercase. Passwords must contain 8–128 characters.
-- Registration returns `201`; login returns `200`. Both return `{ "user": { "id": "...", "email": "...", "role": "USER" }, "accessToken": "...", "refreshToken": "..." }`. `role` always comes from the stored user; registration ignores a client-supplied role.
-- Refresh accepts `{ "refreshToken": "..." }`, returns `200` with the same response shape, and rotates both tokens. Missing/invalid request fields return `422`; invalid credentials or refresh tokens return `401 UNAUTHENTICATED`. Duplicate email returns `409 CONFLICT`.
+- Registration accepts `{ "fullName": "...", "email": "...", "password": "...", "universityId"?: "<ObjectId>" }`; `fullName` is trimmed, required, and limited to 120 characters. International names are supported. Login accepts `{ "email": "...", "password": "..." }`. Email is trimmed and normalized to lowercase; passwords must contain 8–128 characters. Clients cannot submit a university name.
+- Registration returns `201`; login returns `200`. Both return `{ "user": { "id": "...", "fullName": "...", "email": "...", "role": "USER", "universityId": null }, "accessToken": "...", "refreshToken": "..." }`. A selected university must exist and be active; malformed, nonexistent, or inactive supplied IDs return `422 VALIDATION_ERROR`. University affiliation is optional and self-declared, with no membership proof. `role` always comes from the stored user; a supplied registration role is ignored and cannot create an admin.
+- Refresh accepts `{ "refreshToken": "..." }`, returns `200` with the same user shape, and rotates both tokens. Missing/invalid request fields return `422`; invalid credentials or refresh tokens return `401 UNAUTHENTICATED`. Duplicate email returns `409 CONFLICT`. Legacy accounts without a stored full name return `"fullName": null`; no name is inferred from email.
 - Logout requires an access-token Bearer header, accepts no request body and returns `204`. It revokes that token's refresh-token session; repeating logout is idempotent.
+- `GET /api/universities` is public and returns `{ "items": [{ "id": "...", "name": "..." }], "page": 1, "limit": 20, "total": 0 }`. It lists active universities only, sorted by name and stable ID. Pagination defaults to page `1` and limit `20`, with a maximum limit of `100`; invalid or unknown query fields return `422 VALIDATION_ERROR`.
+- `GET /api/users/me` requires a valid Bearer access token and returns `200` with `{ "user": { "id", "fullName", "email", "role", "universityId" } }`. It resolves the account from the verified token subject; missing/invalid credentials return `401 UNAUTHENTICATED`. The response never includes password hashes, session tokens or internal user fields.
 - Access tokens are short-lived HS256 JWTs signed with `ACCESS_TOKEN_SECRET`. Claims are `sub` (user ID), `sid` (session ID), `role`, `iat` and `exp`; lifetime is configured by `ACCESS_TOKEN_TTL`.
 - Refresh tokens are 32-byte cryptographically random opaque values, returned to Flutter over HTTPS and stored by the client in secure storage. MongoDB stores only their SHA-256 hashes in one `authSessions` document per session. Refresh uses an atomic compare-and-swap on the stored hash and expiration, so only one concurrent use of a token can rotate successfully. Rotated or revoked tokens return `401 UNAUTHENTICATED`. Session expiration is extended by `REFRESH_TOKEN_TTL_DAYS` on rotation.
 - Passwords are hashed with Argon2id. User email has a unique database index; the public registration role is always `USER`.
 
 ## Route catalogue
 
-This catalogue records the full V1 API contract and includes routes that are not implemented yet. The currently mounted routes are listed in [`api/openapi.yaml`](../api/openapi.yaml). In this implementation, only `/health`, `/api/auth/*`, `/api/subjects`, and `/api/tutors/*` are mounted; university catalogue, session/request, review, notification, and admin routes below remain planned and must not be treated as available endpoints.
+This catalogue records the full V1 API contract and includes routes that are not implemented yet. The currently mounted routes are listed in [`api/openapi.yaml`](../api/openapi.yaml). In this implementation, `/health`, `/api/auth/*`, `/api/universities`, `/api/users/me`, `/api/subjects`, and `/api/tutors/*` are mounted; session/request, review, notification, and admin routes below remain planned and must not be treated as available endpoints.
 
 The access column identifies the required role or ownership check. All protected routes also require authentication. Unless specified otherwise, `400`, `401`, `403`, `404`, `409` and `422` may apply according to malformed input, identity, authorization, visibility, state conflict and validation respectively.
 
 | Method and path                                          | Access                          |   Success | Main errors / checks                                                                                                                  |
 | -------------------------------------------------------- | ------------------------------- | --------: | ------------------------------------------------------------------------------------------------------------------------------------- |
 | GET `/api/universities`                                  | Public                          |       200 | Active universities only; optional selection, no proof of membership.                                                                 |
+| GET `/api/users/me`                                      | Authenticated                   |       200 | Current account's public fields; 401 missing/invalid access token.                                                                    |
 | GET `/api/subjects`                                      | Authenticated                   |       200 | Active global plus caller's university subjects; paginated; invalid query returns 422.                                                 |
 | GET `/api/tutors`                                        | Authenticated                   |       200 | ACTIVE public cards only; optional subject, minimum rating, recurring weekday, pagination and allowlisted sort; exclude self.          |
 | GET `/api/tutors/:id`                                    | Authenticated, in scope         |       200 | Active profiles only; 404 absent, DRAFT, SUSPENDED or out of scope; public fields only.                                                |
@@ -138,7 +141,7 @@ Tutor profile and recurring availability route details:
 
 ## Authorization rules
 
-1. Public routes: registration, login, refresh credential and active university catalogue only.
+1. Public routes: registration, login, refresh credential and active university catalogue only. `GET /api/users/me` requires a valid access token.
 2. `USER`: any authenticated user may search and request tutoring. A tutor action requires ownership of an ACTIVE tutor profile where applicable.
 3. Ownership: `/me` routes resolve the profile from the authenticated user. Request and session reads/actions require participant status, except documented admin routes.
 4. Admin: enforce `ADMIN` on all `/api/admin/*` routes on the server. Never trust role or actor IDs in request bodies.

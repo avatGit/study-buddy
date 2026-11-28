@@ -3,25 +3,37 @@ import { createHash, randomBytes } from 'node:crypto';
 import mongoose, { Types } from 'mongoose';
 import { SignJWT } from 'jose';
 import { ApiError } from '../../common/api-error.js';
-import type { AuthClaims, AuthConfig, AuthResponse } from './auth.types.js';
+import type { AuthClaims, AuthConfig, AuthResponse, PublicUser } from './auth.types.js';
 import type { Credentials } from './auth.schemas.js';
 import { AuthSession } from './models/auth-session.js';
 import { User, type UserFields } from './models/user.js';
+import { University } from '../universities/models/university.js';
+import type { RegisterInput } from './auth.schemas.js';
 
 const dummyPasswordHash = argon2.hash(randomBytes(32).toString('base64url'), {
   type: argon2.argon2id,
 });
 
 export async function registerUser(
-  credentials: Credentials,
+  input: RegisterInput,
   config: AuthConfig,
 ): Promise<AuthResponse> {
   await Promise.all([User.init(), AuthSession.init()]);
-  const passwordHash = await argon2.hash(credentials.password, { type: argon2.argon2id });
+  if (
+    input.universityId &&
+    !(await University.exists({ _id: input.universityId, isActive: true }))
+  ) {
+    throw new ApiError(422, 'VALIDATION_ERROR', 'Select an active university.', [
+      { path: 'universityId', message: 'Select an active university.' },
+    ]);
+  }
+  const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
   const user = new User({
-    email: credentials.email,
+    fullName: input.fullName,
+    email: input.email,
     passwordHash,
     role: 'USER',
+    universityId: input.universityId ?? null,
   });
   const sessionId = new Types.ObjectId();
   const refreshToken = createRefreshToken();
@@ -160,18 +172,30 @@ function refreshTokenExpiry(config: AuthConfig, from = new Date()): Date {
 }
 
 function makeAuthResponse(
-  user: Pick<UserFields, 'email' | 'role'> & { _id: Types.ObjectId },
+  user: Pick<UserFields, 'fullName' | 'email' | 'role' | 'universityId'> & {
+    _id: Types.ObjectId;
+  },
   accessToken: string,
   refreshToken: string,
 ): AuthResponse {
   return {
-    user: {
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    },
+    user: serializeUser(user),
     accessToken,
     refreshToken,
+  };
+}
+
+export function serializeUser(
+  user: Pick<UserFields, 'fullName' | 'email' | 'role' | 'universityId'> & {
+    _id: Types.ObjectId;
+  },
+): PublicUser {
+  return {
+    id: user._id.toString(),
+    fullName: user.fullName ?? null,
+    email: user.email,
+    role: user.role,
+    universityId: user.universityId?.toString() ?? null,
   };
 }
 

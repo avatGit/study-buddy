@@ -17,8 +17,8 @@ export function createAuthController(config: AuthConfig): {
 } {
   return {
     register: async (req, res) => {
-      const credentials = registerSchema.parse(req.body);
-      const result = await registerUser(credentials, config);
+      const input = registerSchema.parse(req.body);
+      const result = await registerUser(input, config);
       res.status(201).json(result);
     },
     login: async (req, res) => {
