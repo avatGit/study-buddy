@@ -32,6 +32,7 @@ subjectSchema.pre('validate', function normalizeSubjectName() {
 });
 
 subjectSchema.index({ universityId: 1, normalizedName: 1 }, { unique: true });
+subjectSchema.index({ isActive: 1, universityId: 1, normalizedName: 1, _id: 1 });
 
 export function normalizeSubjectNameValue(name: string): string {
   return name.normalize('NFKC').trim().toLowerCase();

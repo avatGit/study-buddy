@@ -7,6 +7,7 @@ import {
   patchOwnAvailabilityException,
   postOwnAvailabilityException,
 } from '../availability/availability.controller.js';
+import { getTutors } from './tutor-search.controller.js';
 import {
   deleteOwnTutorAvailability,
   getOwnTutorAvailabilities,
@@ -37,6 +38,7 @@ export function createTutorRouter(config: Environment): Router {
   router.delete('/me/exceptions/:exceptionId', deleteOwnAvailabilityException);
   router.post('/me/publish', publishOwnTutorProfile);
   router.post('/me/unpublish', unpublishOwnTutorProfile);
+  router.get('/', getTutors);
   router.get('/:id', getPublicTutorProfileHandler);
 
   return router;
