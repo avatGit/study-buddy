@@ -1,114 +1,118 @@
-import 'package:dio/dio.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../auth/presentation/auth_cubit.dart';
+import '../../../core/theme/app_spacing.dart';
 
-class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+class MainShell extends StatelessWidget {
+  const MainShell({required this.navigationShell, super.key});
+
+  final StatefulNavigationShell navigationShell;
+
+  static const _destinations = [
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home),
+      label: 'Accueil',
+    ),
+    NavigationDestination(icon: Icon(Icons.search), label: 'Rechercher'),
+    NavigationDestination(
+      icon: Icon(Icons.event_note_outlined),
+      selectedIcon: Icon(Icons.event_note),
+      label: 'Mes séances',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: 'Profil',
+    ),
+  ];
 
   @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final user = context.select((AuthCubit cubit) => cubit.state.user);
-    final destinations = const [
-      NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-      NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-      NavigationDestination(
-        icon: Icon(Icons.event_note_outlined),
-        label: 'My Sessions',
-      ),
-      NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(title: Text(destinations[_selectedIndex].label)),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          Center(
-            child: Text(
-              'Welcome${user?.fullName == null ? '' : ', ${user!.fullName}'}',
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('StudyBuddy'),
+      actions: [
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Les notifications arrivent bientôt.'),
             ),
           ),
-          const Center(child: Text('Tutor search')),
-          const Center(child: Text('My sessions')),
-          const _ProfilePanel(),
-        ],
+          icon: const Icon(Icons.notifications_none),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+      ],
+    ),
+    body: navigationShell,
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: navigationShell.currentIndex,
+      destinations: _destinations,
+      onDestinationSelected: (index) => navigationShell.goBranch(
+        index,
+        initialLocation: index == navigationShell.currentIndex,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        destinations: destinations,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-      ),
-    );
-  }
+    ),
+  );
 }
 
-class _ProfilePanel extends StatelessWidget {
-  const _ProfilePanel();
+class HomePlaceholder extends StatelessWidget {
+  const HomePlaceholder({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AuthCubit>().state;
-    final user = state.user;
-    if (user == null) return const SizedBox.shrink();
+  Widget build(BuildContext context) => const _PlaceholderPage(
+    title: 'Bienvenue sur StudyBuddy',
+    message: 'Ton espace étudiant sera bientôt disponible.',
+  );
+}
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          shrinkWrap: true,
-          children: [
-            Text(user.fullName ?? 'Name not provided'),
-            const SizedBox(height: 8),
-            Text(user.email),
-            const SizedBox(height: 8),
-            Text(
-              user.universityId == null
-                  ? 'No university selected'
-                  : 'University selected',
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton(
-              key: const Key('reloadProfileButton'),
-              onPressed: () => _reload(context),
-              child: const Text('Reload profile'),
-            ),
-            FilledButton.tonal(
-              key: const Key('logoutButton'),
-              onPressed: () => context.read<AuthCubit>().logout(),
-              child: const Text('Sign out'),
-            ),
-          ],
-        ),
+class SearchPlaceholder extends StatelessWidget {
+  const SearchPlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlaceholderPage(
+    title: 'Rechercher un tuteur',
+    message: 'La recherche de tuteurs sera bientôt disponible.',
+  );
+}
+
+class SessionsPlaceholder extends StatelessWidget {
+  const SessionsPlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlaceholderPage(
+    title: 'Mes séances',
+    message: 'Tes demandes et séances apparaîtront ici.',
+  );
+}
+
+class ProfilePlaceholder extends StatelessWidget {
+  const ProfilePlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _PlaceholderPage(
+    title: 'Profil',
+    message: 'Les informations de ton compte apparaîtront ici.',
+  );
+}
+
+class _PlaceholderPage extends StatelessWidget {
+  const _PlaceholderPage({required this.title, required this.message});
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.pageMargin),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: AppSpacing.sm),
+          Text(message, textAlign: TextAlign.center),
+        ],
       ),
-    );
-  }
-
-  Future<void> _reload(BuildContext context) async {
-    try {
-      await context.read<AuthCubit>().reloadCurrentUser();
-    } on DioException {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to reload your profile.')),
-        );
-      }
-    } on FormatException {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to reload your profile.')),
-        );
-      }
-    }
-  }
+    ),
+  );
 }

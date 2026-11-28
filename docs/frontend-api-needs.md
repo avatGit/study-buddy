@@ -1,7 +1,12 @@
-# Deferred frontend API needs
+# Besoins API frontend restants
 
-## Password recovery
+Les parcours Flutter de connexion, inscription, restauration de session, déconnexion et choix facultatif d’université utilisent les routes et contrats présents dans `api/` et `api/openapi.yaml` :
 
-Password recovery is deferred. The Flutter sign-in screen may show “Forgot password? — Coming soon” as a disabled action, but it must not navigate or send a request. No password-recovery endpoint is implemented or documented as available.
+- `POST /api/auth/register` accepte `fullName` (1–120 caractères après trim), `email` (254 caractères maximum, normalisé en minuscules), `password` (8–128 caractères) et `universityId` facultatif. Une université fournie doit exister et être active.
+- `POST /api/auth/login`, `POST /api/auth/refresh` et `POST /api/auth/logout` sont intégrés. Le refresh token est conservé en stockage sécurisé ; l’access token reste en mémoire.
+- `GET /api/users/me` restaure les informations publiques du compte avec un Bearer access token. Au redémarrage, Flutter renouvelle d’abord le refresh token conservé, puis charge le profil courant.
+- `GET /api/universities?page=…&limit=100` alimente le champ facultatif. Flutter charge chaque page et présente les états chargement, erreur/reprise, liste vide et liste chargée.
 
-Do not design or wire a client contract until email delivery and the secure reset-token flow have been agreed. The future backend design must specify token entropy, hashing at rest, expiration, single-use behavior, rate limits, privacy-preserving responses for unknown emails, password policy, and whether active refresh-token sessions are revoked after a reset. These are future requirements, not current API behavior.
+## Récupération de mot de passe — reportée
+
+L’interface affiche « Bientôt disponible ». L’API ne définit pas de route de récupération, de corps de requête ni de réponse pour ce parcours. Aucun appel n’est effectué et ce parcours reste hors de l’issue #22.

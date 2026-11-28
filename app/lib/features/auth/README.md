@@ -1,1 +1,1 @@
-Authentication feature scaffold. Planned screens: sign in and sign up. Planned logic: auth BLoC, auth repository contract, API service and secure token persistence.
+Authentication owns sign-in and registration screens, its BLoC, repository contract, DTOs, and repository implementations. Shared HTTP and secure storage stay in `core`.

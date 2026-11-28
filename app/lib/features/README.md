@@ -1,1 +1,1 @@
-Organize by user feature. Each feature can contain presentation (screens and BLoC), domain (entities and repository contracts), and data (API services, DTOs and repository implementations). Add use cases only where logic is complex or reused.
+Organize by user feature. Each feature contains presentation (screens and BLoC/Cubit), domain (entities and repository contracts), and data (API services, DTOs and repository implementations). Add use cases only where logic is complex or reused.

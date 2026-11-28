@@ -1,1 +1,1 @@
-App-wide setup: API client, routing, design tokens, secure token storage and shared error/result types. Feature-specific behavior belongs in its feature folder.
+App-wide infrastructure lives in config, errors, network, router, storage, and theme. Shared UI components live in `shared/widgets`; feature behavior stays under `features/<feature>`.
