@@ -282,12 +282,46 @@ class _AuthPageState extends State<AuthPage> {
         future: _universities,
         builder: (context, snapshot) {
           final items = snapshot.data ?? const <UniversityOption>[];
+          const decoration = InputDecoration(
+            labelText: 'Université (facultatif)',
+            helperText: 'Déclarée par toi, non vérifiée.',
+          );
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const InputDecorator(
+              decoration: decoration,
+              child: Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: AppSpacing.md),
+                  Text('Chargement des universités…', style: AppTypography.bodyMedium),
+                ],
+              ),
+            );
+          }
+          if (snapshot.hasError) {
+            return InputDecorator(
+              decoration: decoration.copyWith(errorText: 'Impossible de charger la liste.'),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _universities = context.read<AuthCubit>().universities();
+                  }),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
+                ),
+              ),
+            );
+          }
           return DropdownButtonFormField<String>(
             initialValue: _universityId,
-            decoration: const InputDecoration(
-              labelText: 'Université (facultatif)',
-              helperText: 'Déclarée par toi, non vérifiée.',
+            decoration: decoration.copyWith(
+              helperText: items.isEmpty ? 'Aucune université disponible' : 'Déclarée par toi, non vérifiée.',
             ),
+            hint: Text(items.isEmpty ? 'Aucune université disponible' : 'Choisir une université'),
             items: [
               const DropdownMenuItem<String>(value: null, child: Text('Aucune université')),
               ...items.map((option) => DropdownMenuItem(

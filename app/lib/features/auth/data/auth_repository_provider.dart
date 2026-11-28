@@ -9,6 +9,9 @@ import 'mock_auth_repository.dart';
 class AuthDependencies {
   AuthDependencies._({required this.repository, this.tokens});
 
+  factory AuthDependencies.withRepository(AuthRepository repository) =>
+      AuthDependencies._(repository: repository);
+
   final AuthRepository repository;
   final SessionTokens? tokens;
 
