@@ -24,7 +24,7 @@ void main() {
       ),
     );
     expect(failure.kind, FailureKind.validation);
-    expect(failure.fieldErrors['email'], 'Invalid email');
+    expect(failure.fieldErrors['email'], 'Saisis une adresse e-mail valide.');
     expect(failure.message, 'Vérifie les champs indiqués.');
   });
 

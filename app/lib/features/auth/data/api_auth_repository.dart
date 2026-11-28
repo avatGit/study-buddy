@@ -96,16 +96,30 @@ class ApiAuthRepository implements AuthRepository {
   @override
   Future<List<UniversityOption>> universities() async {
     try {
-      final response = await _client.dio.get<Object?>(ApiPaths.universities);
-      final body = response.data;
-      if (body is! Map || body['items'] is! List) {
-        throw const FormatException('Invalid university list response');
-      }
-      return (body['items'] as List)
-          .whereType<Map>()
-          .map(UniversityDto.fromJson)
-          .map((dto) => dto.toEntity())
-          .toList(growable: false);
+      const pageSize = 100;
+      final universities = <UniversityOption>[];
+      var page = 1;
+      var total = 0;
+      do {
+        final response = await _client.dio.get<Object?>(
+          ApiPaths.universities,
+          queryParameters: {'page': page, 'limit': pageSize},
+        );
+        final body = response.data;
+        if (body is! Map || body['items'] is! List || body['total'] is! num) {
+          throw const FormatException('Invalid university list response');
+        }
+        final items = (body['items'] as List)
+            .whereType<Map>()
+            .map(UniversityDto.fromJson)
+            .map((dto) => dto.toEntity())
+            .toList(growable: false);
+        universities.addAll(items);
+        total = (body['total'] as num).toInt();
+        if (items.isEmpty) break;
+        page++;
+      } while (universities.length < total);
+      return List.unmodifiable(universities);
     } on DioException catch (error) {
       throw mapDioFailure(error);
     }

@@ -320,6 +320,9 @@ class _AuthPageState extends State<AuthPage> {
             initialValue: _universityId,
             decoration: decoration.copyWith(
               helperText: items.isEmpty ? 'Aucune université disponible' : 'Déclarée par toi, non vérifiée.',
+              errorText: context.select<AuthCubit, String?>(
+                (cubit) => cubit.state.fieldErrors['universityId'],
+              ),
             ),
             hint: Text(items.isEmpty ? 'Aucune université disponible' : 'Choisir une université'),
             items: [

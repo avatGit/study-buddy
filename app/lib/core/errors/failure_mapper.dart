@@ -37,7 +37,8 @@ AppFailure mapDioFailure(DioException exception) {
   if (details is List) {
     for (final detail in details) {
       if (detail is Map && detail['path'] != null && detail['message'] != null) {
-        fields[detail['path'].toString()] = detail['message'].toString();
+        final path = detail['path'].toString();
+        fields[path] = _fieldMessage(path, detail['message'].toString());
       }
     }
   }
@@ -57,7 +58,9 @@ AppFailure mapDioFailure(DioException exception) {
     FailureKind.unauthenticated => 'Adresse e-mail ou mot de passe incorrect.',
     FailureKind.forbidden => 'Tu n’as pas accès à cette action.',
     FailureKind.notFound => 'Cette information est introuvable.',
-    FailureKind.conflict => 'Cette action est en conflit avec ton compte.',
+    FailureKind.conflict => code == 'CONFLICT' && (serverMessage?.contains('email') ?? false)
+        ? 'Un compte existe déjà avec cette adresse e-mail.'
+        : 'Cette action est en conflit avec ton compte.',
     FailureKind.validation => 'Vérifie les champs indiqués.',
     FailureKind.rateLimited => 'Trop de tentatives. Réessaie un peu plus tard.',
     FailureKind.payloadTooLarge => 'Les données envoyées sont trop volumineuses.',
@@ -72,3 +75,19 @@ AppFailure mapDioFailure(DioException exception) {
     code: code,
   );
 }
+
+String _fieldMessage(String path, String serverMessage) => switch (path) {
+      'fullName' => serverMessage.contains('120')
+          ? 'Le nom ne peut pas dépasser 120 caractères.'
+          : 'Saisis ton nom complet.',
+      'email' => serverMessage.contains('254')
+          ? 'L’adresse e-mail ne peut pas dépasser 254 caractères.'
+          : 'Saisis une adresse e-mail valide.',
+      'password' => serverMessage.contains('128')
+          ? 'Le mot de passe ne peut pas dépasser 128 caractères.'
+          : 'Le mot de passe doit contenir entre 8 et 128 caractères.',
+      'universityId' => serverMessage.contains('active')
+          ? 'Choisis une université active.'
+          : 'Choisis une université valide.',
+      _ => serverMessage,
+    };
