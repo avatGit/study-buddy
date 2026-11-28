@@ -28,6 +28,7 @@ const recurringAvailabilitySchema = new Schema<RecurringAvailabilityFields>(
 );
 
 recurringAvailabilitySchema.index({ tutorProfileId: 1, dayOfWeek: 1, startTime: 1 });
+recurringAvailabilitySchema.index({ dayOfWeek: 1, tutorProfileId: 1 });
 
 const existingModel = mongoose.models.RecurringAvailability as
   | Model<RecurringAvailabilityFields>

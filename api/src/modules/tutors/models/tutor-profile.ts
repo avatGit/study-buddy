@@ -8,6 +8,8 @@ export interface TutorProfileFields {
   bio: string;
   subjectIds: Types.ObjectId[];
   status: TutorProfileStatus;
+  averageRating: number;
+  reviewCount: number;
 }
 
 const tutorProfileSchema = new Schema<TutorProfileFields>(
@@ -32,6 +34,20 @@ const tutorProfileSchema = new Schema<TutorProfileFields>(
       required: true,
       default: 'DRAFT',
     },
+    averageRating: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 5,
+      default: 0,
+    },
+    reviewCount: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: Number.isInteger,
+      default: 0,
+    },
   },
   {
     collection: 'tutorProfiles',
@@ -41,6 +57,10 @@ const tutorProfileSchema = new Schema<TutorProfileFields>(
 );
 
 tutorProfileSchema.index({ status: 1, updatedAt: -1 });
+tutorProfileSchema.index({ status: 1, subjectIds: 1 });
+tutorProfileSchema.index({ status: 1, averageRating: -1, reviewCount: -1, _id: 1 });
+tutorProfileSchema.index({ status: 1, createdAt: -1, _id: -1 });
+tutorProfileSchema.index({ status: 1, displayName: 1, _id: 1 });
 
 const existingModel = mongoose.models.TutorProfile as Model<TutorProfileFields> | undefined;
 
