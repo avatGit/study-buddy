@@ -5,8 +5,11 @@ void main() {
   test('validates required names and email format', () {
     expect(AuthFormValidators.required('  '), isNotNull);
     expect(AuthFormValidators.required('Aïcha Diallo'), isNull);
+    expect(AuthFormValidators.fullName('A' * 121), isNotNull);
+    expect(AuthFormValidators.fullName('Aïcha Diallo'), isNull);
     expect(AuthFormValidators.email('student.example.test'), isNotNull);
     expect(AuthFormValidators.email('student@example.test'), isNull);
+    expect(AuthFormValidators.email('${'a' * 245}@example.test'), isNotNull);
   });
 
   test('matches the API password length constraints', () {

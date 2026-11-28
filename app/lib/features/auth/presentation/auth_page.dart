@@ -195,7 +195,7 @@ class _AuthPageState extends State<AuthPage> {
                   label: 'Nom complet',
                   errorText: fieldErrors['fullName'],
                   textInputAction: TextInputAction.next,
-                  validator: AuthFormValidators.required,
+                  validator: AuthFormValidators.fullName,
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
