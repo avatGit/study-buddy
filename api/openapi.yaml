@@ -1,0 +1,1219 @@
+openapi: 3.1.0
+info:
+  title: StudyBuddy API
+  version: 0.1.0
+  description: |
+    OpenAPI documentation for routes mounted by the current API implementation only.
+    All routes under /api/subjects and /api/tutors require a Bearer access token,
+    including public tutor reads. University affiliation is optional and self-declared.
+    Users with a university see global and same-university records; users without one
+    see global records only. Errors use the common {error:{code,message,status,details}}
+    envelope; malformed JSON is 400, invalid request data is 422, and unknown routes
+    are 404. JSON bodies are limited to 1 MiB. The general rate limit is 100 requests
+    per 15 minutes; registration and login are limited to 10 attempts per 15 minutes.
+    Production errors do not expose stack traces.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Subjects
+  - name: Tutors
+security: []
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Check API liveness
+      responses:
+        '200':
+          description: The API process is responsive. This check does not verify database readiness.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+              example:
+                status: ok
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      operationId: register
+      summary: Register a USER account
+      description: Public registration always assigns USER. A supplied role is ignored and cannot create an ADMIN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialsRequest'
+            example:
+              email: learner@example.test
+              password: choose-a-local-password
+      responses:
+        '201':
+          description: Account created and tokens issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CredentialsRequest'
+      responses:
+        '200':
+          description: Authenticated user and rotated access/refresh credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      operationId: refreshTokens
+      summary: Rotate a refresh token
+      description: Refresh tokens are opaque values; the server stores only their SHA-256 hashes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+      responses:
+        '200':
+          description: New access and refresh tokens issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Revoke the current refresh-token session
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Session revoked. No response body.
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/subjects:
+    get:
+      tags: [Subjects]
+      operationId: listSubjects
+      summary: List active subjects available in the caller's scope
+      description: |
+        Returns active global subjects and, when the caller has a universityId,
+        active subjects for that university.         Results sort by normalized name ascending and then stable subject ID
+        ascending. Items expose only id, name, optional code, and
+        scope-safe universityId.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated subject catalogue.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Subject'
+              example:
+                items:
+                  - id: '670000000000000000000002'
+                    name: Mathematics
+                    code: MATH
+                    universityId: null
+                page: 1
+                limit: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors:
+    get:
+      tags: [Tutors]
+      operationId: searchTutors
+      summary: Search active tutors
+      description: |
+        Returns ACTIVE profiles in the caller's global/university scope and excludes
+        the caller's own profile. Cards contain only public profile fields and active
+        in-scope subjects; availability and exceptions are not included. A valid but
+        unavailable, inactive, or out-of-scope subjectId produces an empty list.
+        dayOfWeek filters recurring weekly availability only; it is not a date filter
+        and date-specific exceptions are not evaluated. Profiles without reviews have
+        averageRating 0 and reviewCount 0, so minRating 0 includes them and a positive
+        minRating excludes them. A later review implementation must maintain aggregates.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subjectId
+          in: query
+          description: Active subject in the caller's scope; unavailable/out-of-scope IDs return an empty result.
+          required: false
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+        - name: minRating
+          in: query
+          description: Decimal threshold from 0 through 5. Profiles with no reviews have rating 0.
+          required: false
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+        - name: dayOfWeek
+          in: query
+          description: Recurring weekly availability day; 0 is Sunday and 6 is Saturday.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: sort
+          in: query
+          description: |
+            Allowlisted sort. rating_desc sorts by averageRating descending, reviewCount
+            descending, then ID ascending. newest sorts by createdAt descending, then ID
+            descending. name_asc sorts by displayName ascending, then ID ascending.
+          required: false
+          schema:
+            type: string
+            enum: [rating_desc, newest, name_asc]
+            default: rating_desc
+      responses:
+        '200':
+          description: Paginated public tutor cards after all filters.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TutorCard'
+              example:
+                items:
+                  - id: '670000000000000000000021'
+                    displayName: Alex Morgan
+                    bio: Peer tutor offering friendly mathematics and physics support.
+                    universityId: '670000000000000000000001'
+                    subjects:
+                      - id: '670000000000000000000002'
+                        name: Mathematics
+                        code: MATH
+                        universityId: null
+                    averageRating: 0
+                    reviewCount: 0
+                page: 1
+                limit: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/{id}:
+    get:
+      tags: [Tutors]
+      operationId: getPublicTutorProfile
+      summary: Get an active, in-scope tutor profile
+      description: |
+        Requires authentication. DRAFT, SUSPENDED, missing, and out-of-scope profiles
+        all return 404. The response omits private user data, ratings, moderation
+        fields, and exception records.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tutor profile ObjectId.
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Public fields for an ACTIVE tutor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTutorProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/profile:
+    get:
+      tags: [Tutors]
+      operationId: getOwnTutorProfile
+      summary: Get the authenticated user's tutor profile
+      description: Returns the caller's own DRAFT, ACTIVE, or SUSPENDED profile.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Owner profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Tutors]
+      operationId: saveOwnTutorProfile
+      summary: Create or update the authenticated user's tutor profile
+      description: |
+        First creation starts as DRAFT and returns 201; updates return 200. Only
+        displayName, bio, and optional universityId are writable. Ownership, status,
+        subject associations, and rating aggregates are server-controlled.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [displayName, bio]
+              properties:
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                bio:
+                  type: string
+                  maxLength: 5000
+                universityId:
+                  oneOf:
+                    - $ref: '#/components/schemas/ObjectId'
+                    - type: 'null'
+                  description: Optional self-declared affiliation; null clears it.
+      responses:
+        '200':
+          description: Existing profile updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '201':
+          description: DRAFT profile created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/subjects:
+    put:
+      tags: [Tutors]
+      operationId: replaceOwnTutorSubjects
+      summary: Replace the authenticated tutor's subject associations
+      description: Subject IDs must refer to active global or caller-university subjects. An empty array clears associations.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subjectIds]
+              properties:
+                subjectIds:
+                  type: array
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/ObjectId'
+      responses:
+        '200':
+          description: Updated owner profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/availabilities:
+    get:
+      tags: [Tutors]
+      operationId: listOwnAvailabilities
+      summary: List the authenticated tutor's recurring availability
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Owner-scoped, unpaginated availability list, sorted by weekday and start time.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RecurringAvailability'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Tutors]
+      operationId: createOwnAvailability
+      summary: Create a recurring availability window
+      description: Local HH:mm window within one weekday. Overnight windows are not supported; adjacent windows are allowed, overlaps return 409.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringAvailabilityInput'
+            example:
+              dayOfWeek: 1
+              startTime: '09:00'
+              endTime: '11:00'
+              timeZone: Europe/Paris
+      responses:
+        '201':
+          description: Availability created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringAvailability'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/availabilities/{availabilityId}:
+    patch:
+      tags: [Tutors]
+      operationId: updateOwnAvailability
+      summary: Update an owned recurring availability window
+      description: Validates the merged window. IDs belonging to another tutor return 404.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: availabilityId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringAvailabilityPatch'
+      responses:
+        '200':
+          description: Updated availability.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringAvailability'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Tutors]
+      operationId: deleteOwnAvailability
+      summary: Delete an owned recurring availability window
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: availabilityId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '204':
+          description: Availability deleted. No response body.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/exceptions:
+    get:
+      tags: [Tutors]
+      operationId: listOwnAvailabilityExceptions
+      summary: List the authenticated tutor's dated availability exceptions
+      description: Exceptions block recurring availability; they never add availability. Results are ordered by date, start time, and creation time.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Owner-scoped, unpaginated exception list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AvailabilityException'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Tutors]
+      operationId: createOwnAvailabilityException
+      summary: Create a dated blocking exception
+      description: |
+        Date and times are local wall time in the supplied IANA time zone. The date
+        must be today or later in that zone. BLOCK_DAY forbids time fields; BLOCK_TIME
+        requires both same-day HH:mm values with endTime later than startTime.
+        Multiple blocks on a date are allowed and their effect is their union.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/BlockDayInput'
+                - $ref: '#/components/schemas/BlockTimeInput'
+            examples:
+              blockDay:
+                value:
+                  date: '2030-04-15'
+                  kind: BLOCK_DAY
+                  timeZone: Europe/Paris
+              blockTime:
+                value:
+                  date: '2030-04-15'
+                  kind: BLOCK_TIME
+                  timeZone: Europe/Paris
+                  startTime: '09:00'
+                  endTime: '11:00'
+      responses:
+        '201':
+          description: Exception created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityException'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/exceptions/{exceptionId}:
+    patch:
+      tags: [Tutors]
+      operationId: updateOwnAvailabilityException
+      summary: Update an owned dated availability exception
+      description: |
+        Validates the merged resulting record. Changing to BLOCK_DAY clears existing
+        time fields; BLOCK_TIME requires both valid times. IDs belonging to another
+        tutor return 404.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: exceptionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityExceptionPatch'
+      responses:
+        '200':
+          description: Updated exception.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityException'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Tutors]
+      operationId: deleteOwnAvailabilityException
+      summary: Delete an owned dated availability exception
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: exceptionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectId'
+      responses:
+        '204':
+          description: Exception deleted. No response body.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/publish:
+    post:
+      tags: [Tutors]
+      operationId: publishOwnTutorProfile
+      summary: Publish an eligible DRAFT tutor profile
+      description: |
+        Accepts no body. Requires a non-empty bio, at least one active in-scope
+        subject, and at least one recurring availability. A dated exception does not
+        satisfy the availability requirement. Only DRAFT to ACTIVE is allowed.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile published as ACTIVE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/tutors/me/unpublish:
+    post:
+      tags: [Tutors]
+      operationId: unpublishOwnTutorProfile
+      summary: Return an ACTIVE tutor profile to DRAFT
+      description: Accepts no body. Only ACTIVE to DRAFT is allowed; SUSPENDED profiles cannot be unpublished by their owner.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile returned to DRAFT.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnTutorProfile'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived HS256 access token. Refresh tokens are opaque and sent only to /api/auth/refresh.
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 1-based positive safe integer. Defaults to 1; the computed offset must also be safe.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Items per page. Defaults to 20; maximum is 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    ObjectId:
+      type: string
+      pattern: '^[a-fA-F0-9]{24}$'
+      examples: ['670000000000000000000001']
+    ErrorDetail:
+      type: object
+      required: [path, message]
+      properties:
+        path:
+          type: string
+        message:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, status, details]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            status:
+              type: integer
+            details:
+              type: array
+              items:
+                $ref: '#/components/schemas/ErrorDetail'
+    PaginatedResponse:
+      type: object
+      required: [items, page, limit, total]
+      properties:
+        items:
+          type: array
+          items: {}
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+    CredentialsRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Trimmed and normalized to lowercase.
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+    AuthResponse:
+      type: object
+      required: [user, accessToken, refreshToken]
+      properties:
+        user:
+          type: object
+          required: [id, email, role]
+          properties:
+            id:
+              $ref: '#/components/schemas/ObjectId'
+            email:
+              type: string
+              format: email
+            role:
+              type: string
+              enum: [USER, ADMIN]
+        accessToken:
+          type: string
+          description: Short-lived Bearer JWT. Do not log or expose it.
+        refreshToken:
+          type: string
+          description: Opaque rotating token. Store only in secure client storage and do not log it.
+    Subject:
+      type: object
+      required: [id, name, universityId]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+        code:
+          type: string
+        universityId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+    TutorCard:
+      type: object
+      required: [id, displayName, bio, universityId, subjects, averageRating, reviewCount]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        displayName:
+          type: string
+        bio:
+          type: string
+        universityId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+        subjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subject'
+        averageRating:
+          type: number
+          minimum: 0
+          maximum: 5
+        reviewCount:
+          type: integer
+          minimum: 0
+    PublicTutorSubject:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        name:
+          type: string
+        code:
+          type: string
+    PublicAvailability:
+      type: object
+      required: [id, dayOfWeek, startTime, endTime, timeZone]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+    PublicTutorProfile:
+      type: object
+      required: [id, displayName, bio, universityId, subjects, availabilities]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        displayName:
+          type: string
+        bio:
+          type: string
+        universityId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+        subjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTutorSubject'
+        availabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAvailability'
+    OwnTutorProfile:
+      type: object
+      required: [id, displayName, bio, universityId, subjectIds, status]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        displayName:
+          type: string
+        bio:
+          type: string
+        universityId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: 'null'
+        subjectIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectId'
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RecurringAvailabilityInput:
+      type: object
+      additionalProperties: false
+      required: [dayOfWeek, startTime, endTime, timeZone]
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Must be later than startTime; overnight windows are unsupported.
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+    RecurringAvailabilityPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+    RecurringAvailability:
+      type: object
+      required: [id, dayOfWeek, startTime, endTime, timeZone, createdAt, updatedAt]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BlockDayInput:
+      type: object
+      additionalProperties: false
+      required: [date, kind, timeZone]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Today or later in timeZone.
+        kind:
+          type: string
+          const: BLOCK_DAY
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+    BlockTimeInput:
+      type: object
+      additionalProperties: false
+      required: [date, kind, timeZone, startTime, endTime]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Today or later in timeZone.
+        kind:
+          type: string
+          const: BLOCK_TIME
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Must be later than startTime on the same local date.
+    AvailabilityExceptionPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        date:
+          type: string
+          format: date
+        kind:
+          type: string
+          enum: [BLOCK_DAY, BLOCK_TIME]
+        timeZone:
+          type: string
+          description: Valid IANA time-zone identifier.
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+      description: The merged result must satisfy the selected exception kind and local date/time rules.
+    AvailabilityException:
+      type: object
+      required: [id, date, kind, timeZone, createdAt, updatedAt]
+      properties:
+        id:
+          $ref: '#/components/schemas/ObjectId'
+        date:
+          type: string
+          format: date
+        kind:
+          type: string
+          enum: [BLOCK_DAY, BLOCK_TIME]
+        timeZone:
+          type: string
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      description: BLOCK_DAY responses omit startTime and endTime.
+  responses:
+    MalformedRequest:
+      description: Malformed JSON or another malformed request body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: MALFORMED_REQUEST
+              message: The request body contains invalid JSON.
+              status: 400
+              details: []
+    Unauthenticated:
+      description: Missing/invalid Bearer token or invalid refresh credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: UNAUTHENTICATED
+              message: Authentication is required.
+              status: 401
+              details: []
+    Forbidden:
+      description: Authenticated account does not have permission for this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Only USER accounts can manage tutor profiles.
+              status: 403
+              details: []
+    NotFound:
+      description: Resource is missing, unavailable, or outside the caller's scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found.
+              status: 404
+              details: []
+    Conflict:
+      description: Resource state or recurring availability conflicts with this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: CONFLICT
+              message: Recurring availability overlaps an existing window.
+              status: 409
+              details: []
+    ValidationError:
+      description: Request body, path, or query parameter failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed.
+              status: 422
+              details:
+                - path: endTime
+                  message: endTime must be later than startTime on the same weekday.
+    PayloadTooLarge:
+      description: Request body exceeds the 1 MiB JSON limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: PAYLOAD_TOO_LARGE
+              message: The request body exceeds the allowed size.
+              status: 413
+              details: []
+    RateLimited:
+      description: Request rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: RATE_LIMITED
+              message: Too many authentication attempts. Try again later.
+              status: 429
+              details: []
