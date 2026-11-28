@@ -20,6 +20,8 @@ class ApiClient {
   final SessionTokens _tokens;
   final Dio _bareDio;
   late final Dio dio;
+
+  Future<bool> refreshSession() => _tokens.refresh(_bareDio);
 }
 
 class _AuthInterceptor extends Interceptor {
