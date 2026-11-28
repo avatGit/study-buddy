@@ -14,8 +14,11 @@ void main() {
     expect(authRedirect(authenticated, '/sessions'), isNull);
   });
 
-  test('keeps startup on the restoration screen until session check completes', () {
-    expect(authRedirect(const AuthState.restoring(), '/'), isNull);
-    expect(authRedirect(const AuthState.restoring(), '/profile'), '/');
-  });
+  test(
+    'keeps startup on the restoration screen until session check completes',
+    () {
+      expect(authRedirect(const AuthState.restoring(), '/'), isNull);
+      expect(authRedirect(const AuthState.restoring(), '/profile'), '/');
+    },
+  );
 }

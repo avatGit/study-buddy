@@ -18,60 +18,70 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.restoring());
     try {
       final user = await _repository.restoreSession();
-      emit(user == null
-          ? const AuthState.unauthenticated()
-          : AuthState(status: AuthStatus.authenticated, user: user));
+      emit(
+        user == null
+            ? const AuthState.unauthenticated()
+            : AuthState(status: AuthStatus.authenticated, user: user),
+      );
     } catch (_) {
       emit(const AuthState.unauthenticated());
     }
   }
 
   Future<void> login({required String email, required String password}) =>
-      _authenticate(() => _repository.login(email: email, password: password), 'Connexion réussie.');
+      _authenticate(
+        () => _repository.login(email: email, password: password),
+        'Connexion réussie.',
+      );
 
   Future<void> register({
     required String fullName,
     required String email,
     required String password,
     String? universityId,
-  }) =>
-      _authenticate(
-        () => _repository.register(
-          fullName: fullName,
-          email: email,
-          password: password,
-          universityId: universityId,
-        ),
-        'Ton compte StudyBuddy est créé.',
-      );
+  }) => _authenticate(
+    () => _repository.register(
+      fullName: fullName,
+      email: email,
+      password: password,
+      universityId: universityId,
+    ),
+    'Ton compte StudyBuddy est créé.',
+  );
 
-  Future<void> _authenticate(Future<StudyUser> Function() action, String success) async {
+  Future<void> _authenticate(
+    Future<StudyUser> Function() action,
+    String success,
+  ) async {
     emit(const AuthState(status: AuthStatus.submitting));
     try {
       final user = await action();
-      emit(AuthState(
-        status: AuthStatus.authenticated,
-        user: user,
-        successMessage: success,
-      ));
-    } on AppFailure catch (failure) {
-      emit(AuthState(
-        status: AuthStatus.unauthenticated,
-        failure: failure,
-      ));
-    } on DioException catch (error) {
-      emit(AuthState(
-        status: AuthStatus.unauthenticated,
-        failure: mapDioFailure(error),
-      ));
-    } catch (_) {
-      emit(const AuthState(
-        status: AuthStatus.unauthenticated,
-        failure: AppFailure(
-          kind: FailureKind.unknown,
-          message: 'Une erreur est survenue. Réessaie.',
+      emit(
+        AuthState(
+          status: AuthStatus.authenticated,
+          user: user,
+          successMessage: success,
         ),
-      ));
+      );
+    } on AppFailure catch (failure) {
+      emit(AuthState(status: AuthStatus.unauthenticated, failure: failure));
+    } on DioException catch (error) {
+      emit(
+        AuthState(
+          status: AuthStatus.unauthenticated,
+          failure: mapDioFailure(error),
+        ),
+      );
+    } catch (_) {
+      emit(
+        const AuthState(
+          status: AuthStatus.unauthenticated,
+          failure: AppFailure(
+            kind: FailureKind.unknown,
+            message: 'Une erreur est survenue. Réessaie.',
+          ),
+        ),
+      );
     }
   }
 

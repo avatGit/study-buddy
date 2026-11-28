@@ -67,48 +67,53 @@ class _RequestAdapter implements HttpClientAdapter {
   }
 
   ResponseBody _json(Object body) => ResponseBody.fromString(
-        jsonEncode(body),
-        200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-      );
+    jsonEncode(body),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
 
   @override
   void close({bool force = false}) {}
 }
 
 void main() {
-  test('sends the API registration schema fields and optional university ID', () async {
-    final tokens = SessionTokens(_MemoryTokenStore());
-    final adapter = _RequestAdapter();
-    final client = ApiClient(tokens: tokens, adapter: adapter);
-    addTearDown(client.close);
-    final repository = ApiAuthRepository(client: client, tokens: tokens);
+  test(
+    'sends the API registration schema fields and optional university ID',
+    () async {
+      final tokens = SessionTokens(_MemoryTokenStore());
+      final adapter = _RequestAdapter();
+      final client = ApiClient(tokens: tokens, adapter: adapter);
+      addTearDown(client.close);
+      final repository = ApiAuthRepository(client: client, tokens: tokens);
 
-    await repository.register(
-      fullName: ' Aïcha Diallo ',
-      email: ' aicha@example.test ',
-      password: 'A secure password 123',
-      universityId: '670000000000000000000001',
-    );
+      await repository.register(
+        fullName: ' Aïcha Diallo ',
+        email: ' aicha@example.test ',
+        password: 'A secure password 123',
+        universityId: '670000000000000000000001',
+      );
 
-    expect(adapter.registrationBody, {
-      'fullName': 'Aïcha Diallo',
-      'email': 'aicha@example.test',
-      'password': 'A secure password 123',
-      'universityId': '670000000000000000000001',
-    });
+      expect(adapter.registrationBody, {
+        'fullName': 'Aïcha Diallo',
+        'email': 'aicha@example.test',
+        'password': 'A secure password 123',
+        'universityId': '670000000000000000000001',
+      });
 
-    await repository.register(
-      fullName: 'Aïcha Diallo',
-      email: 'aicha@example.test',
-      password: 'A secure password 123',
-    );
-    expect(adapter.registrationBody, {
-      'fullName': 'Aïcha Diallo',
-      'email': 'aicha@example.test',
-      'password': 'A secure password 123',
-    });
-  });
+      await repository.register(
+        fullName: 'Aïcha Diallo',
+        email: 'aicha@example.test',
+        password: 'A secure password 123',
+      );
+      expect(adapter.registrationBody, {
+        'fullName': 'Aïcha Diallo',
+        'email': 'aicha@example.test',
+        'password': 'A secure password 123',
+      });
+    },
+  );
 
   test('loads every page of the university catalogue', () async {
     final tokens = SessionTokens(_MemoryTokenStore());

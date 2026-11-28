@@ -16,9 +16,9 @@ abstract interface class AuthRepository {
 }
 
 AppFailure validationFailure(Map<String, String> errors) => AppFailure(
-      kind: FailureKind.validation,
-      message: 'Vérifie les champs indiqués.',
-      fieldErrors: errors,
-      code: 'VALIDATION_ERROR',
-      statusCode: 422,
-    );
+  kind: FailureKind.validation,
+  message: 'Vérifie les champs indiqués.',
+  fieldErrors: errors,
+  code: 'VALIDATION_ERROR',
+  statusCode: 422,
+);

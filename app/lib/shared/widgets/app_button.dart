@@ -23,7 +23,10 @@ class AppButton extends StatelessWidget {
           )
         : Text(label);
     if (secondary) {
-      return OutlinedButton(onPressed: loading ? null : onPressed, child: child);
+      return OutlinedButton(
+        onPressed: loading ? null : onPressed,
+        child: child,
+      );
     }
     return FilledButton(onPressed: loading ? null : onPressed, child: child);
   }

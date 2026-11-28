@@ -59,31 +59,36 @@ class _RestoreAdapter implements HttpClientAdapter {
   }
 
   ResponseBody _response(Object body) => ResponseBody.fromString(
-        jsonEncode(body),
-        200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-      );
+    jsonEncode(body),
+    200,
+    headers: {
+      Headers.contentTypeHeader: [Headers.jsonContentType],
+    },
+  );
 
   @override
   void close({bool force = false}) {}
 }
 
 void main() {
-  test('restores by rotating the saved refresh token then reading /users/me', () async {
-    final store = _MemoryTokenStore('old-refresh');
-    final tokens = SessionTokens(store);
-    final adapter = _RestoreAdapter();
-    final client = ApiClient(tokens: tokens, adapter: adapter);
-    addTearDown(client.close);
-    final repository = ApiAuthRepository(client: client, tokens: tokens);
+  test(
+    'restores by rotating the saved refresh token then reading /users/me',
+    () async {
+      final store = _MemoryTokenStore('old-refresh');
+      final tokens = SessionTokens(store);
+      final adapter = _RestoreAdapter();
+      final client = ApiClient(tokens: tokens, adapter: adapter);
+      addTearDown(client.close);
+      final repository = ApiAuthRepository(client: client, tokens: tokens);
 
-    final user = await repository.restoreSession();
+      final user = await repository.restoreSession();
 
-    expect(adapter.paths, ['/api/auth/refresh', '/api/users/me']);
-    expect(user?.id, 'user-1');
-    expect(user?.fullName, 'Aïcha Diallo');
-    expect(await tokens.refreshToken, 'rotated-refresh');
-  });
+      expect(adapter.paths, ['/api/auth/refresh', '/api/users/me']);
+      expect(user?.id, 'user-1');
+      expect(user?.fullName, 'Aïcha Diallo');
+      expect(await tokens.refreshToken, 'rotated-refresh');
+    },
+  );
 
   test('does not make requests when no refresh credential is stored', () async {
     final tokens = SessionTokens(_MemoryTokenStore(null));
@@ -91,7 +96,10 @@ void main() {
     final client = ApiClient(tokens: tokens, adapter: adapter);
     addTearDown(client.close);
 
-    expect(await ApiAuthRepository(client: client, tokens: tokens).restoreSession(), isNull);
+    expect(
+      await ApiAuthRepository(client: client, tokens: tokens).restoreSession(),
+      isNull,
+    );
     expect(adapter.paths, isEmpty);
   });
 }

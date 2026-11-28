@@ -32,19 +32,19 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        onChanged: onChanged,
-        validator: validator,
-        enabled: enabled,
-        autovalidateMode: autovalidateMode,
-        decoration: InputDecoration(
-          labelText: label,
-          errorText: errorText,
-          prefixIcon: prefixIcon,
-          suffixIcon: suffix,
-        ),
-      );
+    controller: controller,
+    obscureText: obscureText,
+    keyboardType: keyboardType,
+    textInputAction: textInputAction,
+    onChanged: onChanged,
+    validator: validator,
+    enabled: enabled,
+    autovalidateMode: autovalidateMode,
+    decoration: InputDecoration(
+      labelText: label,
+      errorText: errorText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffix,
+    ),
+  );
 }

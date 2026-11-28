@@ -33,24 +33,28 @@ class _UniversityRepository implements AuthRepository {
     required String email,
     required String password,
     String? universityId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> logout() async {}
 }
 
-Future<void> _openSignUp(WidgetTester tester, _UniversityRepository repository) async {
-  await tester.pumpWidget(StudyBuddyApp(
-    dependencies: AuthDependencies.withRepository(repository),
-  ));
+Future<void> _openSignUp(
+  WidgetTester tester,
+  _UniversityRepository repository,
+) async {
+  await tester.pumpWidget(
+    StudyBuddyApp(dependencies: AuthDependencies.withRepository(repository)),
+  );
   await tester.pumpAndSettle();
   await tester.tap(find.text('Créer un compte').first);
   await tester.pump();
 }
 
 void main() {
-  testWidgets('shows loading and empty university catalogue states', (tester) async {
+  testWidgets('shows loading and empty university catalogue states', (
+    tester,
+  ) async {
     final repository = _UniversityRepository();
     await _openSignUp(tester, repository);
 
@@ -64,7 +68,9 @@ void main() {
     expect(find.text('Université (facultatif)'), findsOneWidget);
   });
 
-  testWidgets('shows an error and retries loading universities', (tester) async {
+  testWidgets('shows an error and retries loading universities', (
+    tester,
+  ) async {
     final repository = _UniversityRepository();
     await _openSignUp(tester, repository);
     repository.requests.first.completeError(StateError('offline'));
@@ -79,7 +85,10 @@ void main() {
     expect(find.text('Chargement des universités…'), findsOneWidget);
 
     repository.requests[1].complete(const [
-      UniversityOption(id: '670000000000000000000001', name: 'Université de test'),
+      UniversityOption(
+        id: '670000000000000000000001',
+        name: 'Université de test',
+      ),
     ]);
     await tester.pumpAndSettle();
     final dropdown = find.byType(DropdownButtonFormField<String>);

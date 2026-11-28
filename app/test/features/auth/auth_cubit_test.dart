@@ -13,7 +13,10 @@ class _Repository implements AuthRepository {
   final AppFailure? loginFailure;
 
   @override
-  Future<StudyUser> login({required String email, required String password}) async {
+  Future<StudyUser> login({
+    required String email,
+    required String password,
+  }) async {
     if (loginFailure case final failure?) throw failure;
     return loginResult!;
   }
@@ -47,29 +50,51 @@ void main() {
     build: () => AuthCubit(_Repository(loginResult: user)),
     act: (cubit) => cubit.login(email: user.email, password: 'Secret123!'),
     expect: () => [
-      isA<AuthState>().having((state) => state.status, 'status', AuthStatus.submitting),
+      isA<AuthState>().having(
+        (state) => state.status,
+        'status',
+        AuthStatus.submitting,
+      ),
       isA<AuthState>()
           .having((state) => state.status, 'status', AuthStatus.authenticated)
           .having((state) => state.user?.id, 'user id', user.id)
-          .having((state) => state.successMessage, 'success', 'Connexion réussie.'),
+          .having(
+            (state) => state.successMessage,
+            'success',
+            'Connexion réussie.',
+          ),
     ],
   );
 
   blocTest<AuthCubit, AuthState>(
     'emits a typed error after failed login',
-    build: () => AuthCubit(_Repository(
-      loginFailure: const AppFailure(
-        kind: FailureKind.unauthenticated,
-        message: 'Identifiants incorrects',
+    build: () => AuthCubit(
+      _Repository(
+        loginFailure: const AppFailure(
+          kind: FailureKind.unauthenticated,
+          message: 'Identifiants incorrects',
+        ),
       ),
-    )),
+    ),
     act: (cubit) => cubit.login(email: user.email, password: 'bad'),
     expect: () => [
-      isA<AuthState>().having((state) => state.status, 'status', AuthStatus.submitting),
+      isA<AuthState>().having(
+        (state) => state.status,
+        'status',
+        AuthStatus.submitting,
+      ),
       isA<AuthState>()
           .having((state) => state.status, 'status', AuthStatus.unauthenticated)
-          .having((state) => state.failure?.kind, 'failure kind', FailureKind.unauthenticated)
-          .having((state) => state.failure?.message, 'failure message', 'Identifiants incorrects'),
+          .having(
+            (state) => state.failure?.kind,
+            'failure kind',
+            FailureKind.unauthenticated,
+          )
+          .having(
+            (state) => state.failure?.message,
+            'failure message',
+            'Identifiants incorrects',
+          ),
     ],
   );
 }

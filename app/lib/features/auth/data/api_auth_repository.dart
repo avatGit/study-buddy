@@ -11,8 +11,8 @@ import 'auth_dto.dart';
 
 class ApiAuthRepository implements AuthRepository {
   ApiAuthRepository({required ApiClient client, required SessionTokens tokens})
-      : _client = client,
-        _tokens = tokens;
+    : _client = client,
+      _tokens = tokens;
 
   final ApiClient _client;
   final SessionTokens _tokens;
@@ -21,7 +21,9 @@ class ApiAuthRepository implements AuthRepository {
   Future<StudyUser?> restoreSession() async {
     final refreshToken = await _tokens.refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) return null;
-    if (_tokens.accessToken == null && !await _client.refreshSession()) return null;
+    if (_tokens.accessToken == null && !await _client.refreshSession()) {
+      return null;
+    }
     try {
       return await currentUser();
     } on AppFailure catch (failure) {
@@ -45,14 +47,20 @@ class ApiAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<StudyUser> login({required String email, required String password}) async {
+  Future<StudyUser> login({
+    required String email,
+    required String password,
+  }) async {
     try {
       final response = await _client.dio.post<Object?>(
         ApiPaths.login,
         data: {'email': email.trim(), 'password': password},
       );
       final dto = AuthDto.fromJson(response.data as Map);
-      await _tokens.save(accessToken: dto.accessToken, refreshToken: dto.refreshToken);
+      await _tokens.save(
+        accessToken: dto.accessToken,
+        refreshToken: dto.refreshToken,
+      );
       return dto.user;
     } on DioException catch (error) {
       throw mapDioFailure(error);
@@ -74,9 +82,15 @@ class ApiAuthRepository implements AuthRepository {
         'password': password,
         'universityId': ?normalizedUniversityId,
       };
-      final response = await _client.dio.post<Object?>(ApiPaths.register, data: data);
+      final response = await _client.dio.post<Object?>(
+        ApiPaths.register,
+        data: data,
+      );
       final dto = AuthDto.fromJson(response.data as Map);
-      await _tokens.save(accessToken: dto.accessToken, refreshToken: dto.refreshToken);
+      await _tokens.save(
+        accessToken: dto.accessToken,
+        refreshToken: dto.refreshToken,
+      );
       return dto.user;
     } on DioException catch (error) {
       throw mapDioFailure(error);

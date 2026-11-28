@@ -48,13 +48,18 @@ class _AuthAdapter implements HttpClientAdapter {
     }
     if (protectedRequests == 2) firstUnauthorizedWave.complete();
     await firstUnauthorizedWave.future;
-    return _jsonResponse({'error': {'code': 'UNAUTHENTICATED'}}, status: 401);
+    return _jsonResponse({
+      'error': {'code': 'UNAUTHENTICATED'},
+    }, status: 401);
   }
 
-  ResponseBody _jsonResponse(Object body, {int status = 200}) => ResponseBody.fromString(
+  ResponseBody _jsonResponse(Object body, {int status = 200}) =>
+      ResponseBody.fromString(
         jsonEncode(body),
         status,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
       );
 
   @override
@@ -62,23 +67,29 @@ class _AuthAdapter implements HttpClientAdapter {
 }
 
 void main() {
-  test('parallel 401 responses share one refresh and replay each request once', () async {
-    final store = _MemoryTokenStore()..token = 'old-refresh';
-    final tokens = SessionTokens(store);
-    await tokens.save(accessToken: 'expired-access', refreshToken: 'old-refresh');
-    final adapter = _AuthAdapter();
-    final client = ApiClient(tokens: tokens, adapter: adapter);
-    addTearDown(client.close);
+  test(
+    'parallel 401 responses share one refresh and replay each request once',
+    () async {
+      final store = _MemoryTokenStore()..token = 'old-refresh';
+      final tokens = SessionTokens(store);
+      await tokens.save(
+        accessToken: 'expired-access',
+        refreshToken: 'old-refresh',
+      );
+      final adapter = _AuthAdapter();
+      final client = ApiClient(tokens: tokens, adapter: adapter);
+      addTearDown(client.close);
 
-    final responses = await Future.wait([
-      client.dio.get<Object?>('/api/private/one'),
-      client.dio.get<Object?>('/api/private/two'),
-    ]);
+      final responses = await Future.wait([
+        client.dio.get<Object?>('/api/private/one'),
+        client.dio.get<Object?>('/api/private/two'),
+      ]);
 
-    expect(responses, hasLength(2));
-    expect(adapter.refreshRequests, 1);
-    expect(adapter.protectedRequests, 4);
-    expect(tokens.accessToken, 'fresh-access');
-    expect(await tokens.refreshToken, 'fresh-refresh');
-  });
+      expect(responses, hasLength(2));
+      expect(adapter.refreshRequests, 1);
+      expect(adapter.protectedRequests, 4);
+      expect(tokens.accessToken, 'fresh-access');
+      expect(await tokens.refreshToken, 'fresh-refresh');
+    },
+  );
 }

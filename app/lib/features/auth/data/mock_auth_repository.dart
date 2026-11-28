@@ -9,9 +9,14 @@ class MockAuthRepository implements AuthRepository {
   MockAuthRepository({
     this.delay = const Duration(milliseconds: 350),
     List<UniversityOption>? universityOptions,
-  }) : _universities = universityOptions ?? const [
-          UniversityOption(id: '670000000000000000000001', name: 'Université de démonstration'),
-        ];
+  }) : _universities =
+           universityOptions ??
+           const [
+             UniversityOption(
+               id: '670000000000000000000001',
+               name: 'Université de démonstration',
+             ),
+           ];
 
   final Duration delay;
   StudyUser? _current;
@@ -37,9 +42,15 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<StudyUser> login({required String email, required String password}) async {
+  Future<StudyUser> login({
+    required String email,
+    required String password,
+  }) async {
     await Future<void>.delayed(delay);
-    final errors = AuthInputValidator.validateLogin(email: email, password: password);
+    final errors = AuthInputValidator.validateLogin(
+      email: email,
+      password: password,
+    );
     if (errors.isNotEmpty) throw validationFailure(errors);
     final account = _accounts[email.trim().toLowerCase()];
     if (account == null || account.password != password) {
@@ -70,7 +81,11 @@ class MockAuthRepository implements AuthRepository {
       password: password,
     );
     if (normalizedUniversityId != null &&
-        !_universities.any((university) => university.id.toLowerCase() == normalizedUniversityId.toLowerCase())) {
+        !_universities.any(
+          (university) =>
+              university.id.toLowerCase() ==
+              normalizedUniversityId.toLowerCase(),
+        )) {
       errors['universityId'] = 'Choisis une université active.';
     }
     if (errors.isNotEmpty) throw validationFailure(errors);
@@ -78,7 +93,9 @@ class MockAuthRepository implements AuthRepository {
       throw const AppFailure(
         kind: FailureKind.conflict,
         message: 'Un compte existe déjà avec cette adresse e-mail.',
-        fieldErrors: {'email': 'Un compte existe déjà avec cette adresse e-mail.'},
+        fieldErrors: {
+          'email': 'Un compte existe déjà avec cette adresse e-mail.',
+        },
         statusCode: 409,
         code: 'CONFLICT',
       );

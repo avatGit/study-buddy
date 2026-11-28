@@ -41,11 +41,11 @@ class _StudyBuddyAppState extends State<StudyBuddyApp> {
 
   @override
   Widget build(BuildContext context) => BlocProvider.value(
-        value: _authCubit,
-        child: MaterialApp.router(
-          title: 'StudyBuddy',
-          theme: AppTheme.light,
-          routerConfig: _router,
-        ),
-      );
+    value: _authCubit,
+    child: MaterialApp.router(
+      title: 'StudyBuddy',
+      theme: AppTheme.light,
+      routerConfig: _router,
+    ),
+  );
 }

@@ -5,14 +5,19 @@ import '../storage/session_tokens.dart';
 import 'api_paths.dart';
 
 class ApiClient {
-  ApiClient({required SessionTokens tokens, String? baseUrl, HttpClientAdapter? adapter})
-      : _tokens = tokens,
-        _bareDio = Dio(BaseOptions(
-          baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 20),
-          contentType: Headers.jsonContentType,
-        )) {
+  ApiClient({
+    required SessionTokens tokens,
+    String? baseUrl,
+    HttpClientAdapter? adapter,
+  }) : _tokens = tokens,
+       _bareDio = Dio(
+         BaseOptions(
+           baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
+           connectTimeout: const Duration(seconds: 15),
+           receiveTimeout: const Duration(seconds: 20),
+           contentType: Headers.jsonContentType,
+         ),
+       ) {
     if (adapter != null) _bareDio.httpClientAdapter = adapter;
     dio = Dio(_bareDio.options);
     if (adapter != null) dio.httpClientAdapter = adapter;
@@ -49,7 +54,10 @@ class _AuthInterceptor extends Interceptor {
   }
 
   @override
-  Future<void> onError(DioException error, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+    DioException error,
+    ErrorInterceptorHandler handler,
+  ) async {
     final request = error.requestOptions;
     if (error.response?.statusCode != 401 ||
         request.extra[_retriedKey] == true ||
@@ -74,5 +82,7 @@ class _AuthInterceptor extends Interceptor {
   }
 
   bool _isPublicAuth(String path) =>
-      path == ApiPaths.login || path == ApiPaths.register || path == ApiPaths.refresh;
+      path == ApiPaths.login ||
+      path == ApiPaths.register ||
+      path == ApiPaths.refresh;
 }

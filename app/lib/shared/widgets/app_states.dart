@@ -9,17 +9,17 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            if (label case final text?) ...[
-              const SizedBox(height: AppSpacing.md),
-              Text(text),
-            ],
-          ],
-        ),
-      );
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        if (label case final text?) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(text),
+        ],
+      ],
+    ),
+  );
 }
 
 class ErrorView extends StatelessWidget {
@@ -29,18 +29,18 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pageMargin),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: AppSpacing.lg),
-              AppButton(label: 'Réessayer', onPressed: onRetry, secondary: true),
-            ],
-          ),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.pageMargin),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.lg),
+          AppButton(label: 'Réessayer', onPressed: onRetry, secondary: true),
+        ],
+      ),
+    ),
+  );
 }
 
 class EmptyView extends StatelessWidget {
@@ -49,11 +49,11 @@ class EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pageMargin),
-          child: Text(message, textAlign: TextAlign.center),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.pageMargin),
+      child: Text(message, textAlign: TextAlign.center),
+    ),
+  );
 }
 
 void showSuccessMessage(BuildContext context, String message) {

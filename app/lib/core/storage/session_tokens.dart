@@ -13,7 +13,10 @@ class SessionTokens {
   String? get accessToken => _accessToken;
   Future<String?> get refreshToken => _store.readRefreshToken();
 
-  Future<void> save({required String accessToken, required String refreshToken}) async {
+  Future<void> save({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
     _accessToken = accessToken;
     await _store.writeRefreshToken(refreshToken);
   }
@@ -40,7 +43,9 @@ class SessionTokens {
         data: {'refreshToken': token},
       );
       final body = response.data;
-      if (body is! Map || body['accessToken'] is! String || body['refreshToken'] is! String) {
+      if (body is! Map ||
+          body['accessToken'] is! String ||
+          body['refreshToken'] is! String) {
         await clear();
         return false;
       }

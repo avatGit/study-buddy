@@ -13,7 +13,9 @@ class AuthDto {
 
   factory AuthDto.fromJson(Map<dynamic, dynamic> json) {
     final userJson = json['user'];
-    if (userJson is! Map || json['accessToken'] is! String || json['refreshToken'] is! String) {
+    if (userJson is! Map ||
+        json['accessToken'] is! String ||
+        json['refreshToken'] is! String) {
       throw const FormatException('Invalid authentication response');
     }
     return AuthDto(
@@ -40,7 +42,9 @@ class StudyUserDto {
   final String? universityId;
 
   factory StudyUserDto.fromJson(Map<dynamic, dynamic> json) {
-    if (json['id'] is! String || json['email'] is! String || json['role'] is! String) {
+    if (json['id'] is! String ||
+        json['email'] is! String ||
+        json['role'] is! String) {
       throw const FormatException('Invalid user response');
     }
     return StudyUserDto(
@@ -53,12 +57,12 @@ class StudyUserDto {
   }
 
   StudyUser toEntity() => StudyUser(
-        id: id,
-        fullName: fullName,
-        email: email,
-        role: role,
-        universityId: universityId,
-      );
+    id: id,
+    fullName: fullName,
+    email: email,
+    role: role,
+    universityId: universityId,
+  );
 }
 
 class UniversityDto {
@@ -68,7 +72,10 @@ class UniversityDto {
     if (json['id'] is! String || json['name'] is! String) {
       throw const FormatException('Invalid university response');
     }
-    return UniversityDto(id: json['id'] as String, name: json['name'] as String);
+    return UniversityDto(
+      id: json['id'] as String,
+      name: json['name'] as String,
+    );
   }
 
   final String id;

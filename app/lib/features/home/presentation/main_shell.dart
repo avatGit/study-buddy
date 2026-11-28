@@ -9,37 +9,51 @@ class MainShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
   static const _destinations = [
-    NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Accueil'),
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home),
+      label: 'Accueil',
+    ),
     NavigationDestination(icon: Icon(Icons.search), label: 'Rechercher'),
-    NavigationDestination(icon: Icon(Icons.event_note_outlined), selectedIcon: Icon(Icons.event_note), label: 'Mes séances'),
-    NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profil'),
+    NavigationDestination(
+      icon: Icon(Icons.event_note_outlined),
+      selectedIcon: Icon(Icons.event_note),
+      label: 'Mes séances',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.person_outline),
+      selectedIcon: Icon(Icons.person),
+      label: 'Profil',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('StudyBuddy'),
-          actions: [
-            IconButton(
-              tooltip: 'Notifications',
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Les notifications arrivent bientôt.')),
-              ),
-              icon: const Icon(Icons.notifications_none),
+    appBar: AppBar(
+      title: const Text('StudyBuddy'),
+      actions: [
+        IconButton(
+          tooltip: 'Notifications',
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Les notifications arrivent bientôt.'),
             ),
-            const SizedBox(width: AppSpacing.xs),
-          ],
-        ),
-        body: navigationShell,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
-          destinations: _destinations,
-          onDestinationSelected: (index) => navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
           ),
+          icon: const Icon(Icons.notifications_none),
         ),
-      );
+        const SizedBox(width: AppSpacing.xs),
+      ],
+    ),
+    body: navigationShell,
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: navigationShell.currentIndex,
+      destinations: _destinations,
+      onDestinationSelected: (index) => navigationShell.goBranch(
+        index,
+        initialLocation: index == navigationShell.currentIndex,
+      ),
+    ),
+  );
 }
 
 class HomePlaceholder extends StatelessWidget {
@@ -47,9 +61,9 @@ class HomePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _PlaceholderPage(
-        title: 'Bienvenue sur StudyBuddy',
-        message: 'Ton espace étudiant sera bientôt disponible.',
-      );
+    title: 'Bienvenue sur StudyBuddy',
+    message: 'Ton espace étudiant sera bientôt disponible.',
+  );
 }
 
 class SearchPlaceholder extends StatelessWidget {
@@ -57,9 +71,9 @@ class SearchPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _PlaceholderPage(
-        title: 'Rechercher un tuteur',
-        message: 'La recherche de tuteurs sera bientôt disponible.',
-      );
+    title: 'Rechercher un tuteur',
+    message: 'La recherche de tuteurs sera bientôt disponible.',
+  );
 }
 
 class SessionsPlaceholder extends StatelessWidget {
@@ -67,9 +81,9 @@ class SessionsPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _PlaceholderPage(
-        title: 'Mes séances',
-        message: 'Tes demandes et séances apparaîtront ici.',
-      );
+    title: 'Mes séances',
+    message: 'Tes demandes et séances apparaîtront ici.',
+  );
 }
 
 class ProfilePlaceholder extends StatelessWidget {
@@ -77,9 +91,9 @@ class ProfilePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const _PlaceholderPage(
-        title: 'Profil',
-        message: 'Les informations de ton compte apparaîtront ici.',
-      );
+    title: 'Profil',
+    message: 'Les informations de ton compte apparaîtront ici.',
+  );
 }
 
 class _PlaceholderPage extends StatelessWidget {
@@ -89,16 +103,16 @@ class _PlaceholderPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pageMargin),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: AppSpacing.sm),
-              Text(message, textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.pageMargin),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: AppSpacing.sm),
+          Text(message, textAlign: TextAlign.center),
+        ],
+      ),
+    ),
+  );
 }

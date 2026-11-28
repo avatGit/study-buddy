@@ -4,9 +4,9 @@ import 'package:studybuddy_app/study_buddy_app.dart';
 
 void main() {
   testWidgets('renders the clean StudyBuddy shell', (tester) async {
-    await tester.pumpWidget(StudyBuddyApp(
-      dependencies: AuthDependencies.create(useMock: true),
-    ));
+    await tester.pumpWidget(
+      StudyBuddyApp(dependencies: AuthDependencies.create(useMock: true)),
+    );
     await tester.pumpAndSettle();
     expect(find.text('StudyBuddy'), findsOneWidget);
   });
