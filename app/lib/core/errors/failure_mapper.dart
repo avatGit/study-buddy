@@ -67,6 +67,9 @@ AppFailure mapDioFailure(DioException exception) {
     FailureKind.server => 'Le service rencontre un problème. Réessaie plus tard.',
     _ => serverMessage ?? 'Une erreur est survenue. Réessaie.',
   };
+  if (kind == FailureKind.conflict && (serverMessage?.contains('email') ?? false)) {
+    fields.putIfAbsent('email', () => 'Un compte existe déjà avec cette adresse e-mail.');
+  }
   return AppFailure(
     kind: kind,
     message: message,

@@ -46,21 +46,23 @@ void main() {
   });
 
   test('maps authentication, rate-limit, payload, conflict, and server errors', () {
-    AppFailure from(String code, int status) => mapDioFailure(
+    AppFailure from(String code, int status, [String message = 'API message']) => mapDioFailure(
           DioException(
             requestOptions: RequestOptions(path: '/test'),
             response: Response<Object?>(
               requestOptions: RequestOptions(path: '/test'),
               statusCode: status,
               data: {
-                'error': {'code': code, 'message': 'API message', 'details': []},
+                'error': {'code': code, 'message': message, 'details': []},
               },
             ),
           ),
         );
 
     expect(from('UNAUTHENTICATED', 401).kind, FailureKind.unauthenticated);
-    expect(from('CONFLICT', 409).kind, FailureKind.conflict);
+    final conflict = from('CONFLICT', 409, 'An account with this email already exists.');
+    expect(conflict.kind, FailureKind.conflict);
+    expect(conflict.fieldErrors['email'], 'Un compte existe déjà avec cette adresse e-mail.');
     expect(from('RATE_LIMITED', 429).kind, FailureKind.rateLimited);
     expect(from('PAYLOAD_TOO_LARGE', 413).kind, FailureKind.payloadTooLarge);
     expect(from('INTERNAL_SERVER_ERROR', 500).kind, FailureKind.server);
