@@ -39,6 +39,7 @@ void main() {
     expect(duplicate.kind, FailureKind.conflict);
     expect(duplicate.statusCode, 409);
     expect(duplicate.code, 'CONFLICT');
+    expect(duplicate.fieldErrors['email'], 'Un compte existe déjà avec cette adresse e-mail.');
 
     final invalidLogin = await _captureFailure(
       () => repository.login(email: 'invalid', password: 'short'),

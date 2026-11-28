@@ -97,6 +97,17 @@ void main() {
       'password': 'A secure password 123',
       'universityId': '670000000000000000000001',
     });
+
+    await repository.register(
+      fullName: 'Aïcha Diallo',
+      email: 'aicha@example.test',
+      password: 'A secure password 123',
+    );
+    expect(adapter.registrationBody, {
+      'fullName': 'Aïcha Diallo',
+      'email': 'aicha@example.test',
+      'password': 'A secure password 123',
+    });
   });
 
   test('loads every page of the university catalogue', () async {

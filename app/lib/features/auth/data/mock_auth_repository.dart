@@ -63,13 +63,14 @@ class MockAuthRepository implements AuthRepository {
   }) async {
     await Future<void>.delayed(delay);
     final normalizedEmail = email.trim().toLowerCase();
+    final normalizedUniversityId = universityId?.trim();
     final errors = AuthInputValidator.validateRegistration(
       fullName: fullName,
       email: email,
       password: password,
     );
-    if (universityId != null &&
-        !_universities.any((university) => university.id.toLowerCase() == universityId.toLowerCase())) {
+    if (normalizedUniversityId != null &&
+        !_universities.any((university) => university.id.toLowerCase() == normalizedUniversityId.toLowerCase())) {
       errors['universityId'] = 'Choisis une université active.';
     }
     if (errors.isNotEmpty) throw validationFailure(errors);
@@ -77,6 +78,7 @@ class MockAuthRepository implements AuthRepository {
       throw const AppFailure(
         kind: FailureKind.conflict,
         message: 'Un compte existe déjà avec cette adresse e-mail.',
+        fieldErrors: {'email': 'Un compte existe déjà avec cette adresse e-mail.'},
         statusCode: 409,
         code: 'CONFLICT',
       );
@@ -86,7 +88,7 @@ class MockAuthRepository implements AuthRepository {
       fullName: fullName.trim(),
       email: normalizedEmail,
       role: 'USER',
-      universityId: universityId,
+      universityId: normalizedUniversityId,
     );
     _accounts[normalizedEmail] = _MockAccount(user, password);
     _current = user;

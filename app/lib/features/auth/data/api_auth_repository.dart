@@ -67,11 +67,12 @@ class ApiAuthRepository implements AuthRepository {
     String? universityId,
   }) async {
     try {
+      final normalizedUniversityId = universityId?.trim();
       final data = <String, Object?>{
         'fullName': fullName.trim(),
         'email': email.trim(),
         'password': password,
-        if (universityId != null && universityId.isNotEmpty) 'universityId': universityId,
+        'universityId': ?normalizedUniversityId,
       };
       final response = await _client.dio.post<Object?>(ApiPaths.register, data: data);
       final dto = AuthDto.fromJson(response.data as Map);
