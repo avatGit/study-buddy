@@ -5,7 +5,7 @@ import '../storage/session_tokens.dart';
 import 'api_paths.dart';
 
 class ApiClient {
-  ApiClient({required SessionTokens tokens, String? baseUrl})
+  ApiClient({required SessionTokens tokens, String? baseUrl, HttpClientAdapter? adapter})
       : _tokens = tokens,
         _bareDio = Dio(BaseOptions(
           baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
@@ -13,7 +13,9 @@ class ApiClient {
           receiveTimeout: const Duration(seconds: 20),
           contentType: Headers.jsonContentType,
         )) {
+    if (adapter != null) _bareDio.httpClientAdapter = adapter;
     dio = Dio(_bareDio.options);
+    if (adapter != null) dio.httpClientAdapter = adapter;
     dio.interceptors.add(_AuthInterceptor(_tokens, _bareDio, dio));
   }
 
@@ -22,6 +24,11 @@ class ApiClient {
   late final Dio dio;
 
   Future<bool> refreshSession() => _tokens.refresh(_bareDio);
+
+  void close() {
+    dio.close(force: true);
+    _bareDio.close(force: true);
+  }
 }
 
 class _AuthInterceptor extends Interceptor {

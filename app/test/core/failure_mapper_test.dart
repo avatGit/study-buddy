@@ -44,4 +44,25 @@ void main() {
     expect(timeout.kind, FailureKind.timeout);
     expect(network.kind, FailureKind.network);
   });
+
+  test('maps authentication, rate-limit, payload, conflict, and server errors', () {
+    AppFailure from(String code, int status) => mapDioFailure(
+          DioException(
+            requestOptions: RequestOptions(path: '/test'),
+            response: Response<Object?>(
+              requestOptions: RequestOptions(path: '/test'),
+              statusCode: status,
+              data: {
+                'error': {'code': code, 'message': 'API message', 'details': []},
+              },
+            ),
+          ),
+        );
+
+    expect(from('UNAUTHENTICATED', 401).kind, FailureKind.unauthenticated);
+    expect(from('CONFLICT', 409).kind, FailureKind.conflict);
+    expect(from('RATE_LIMITED', 429).kind, FailureKind.rateLimited);
+    expect(from('PAYLOAD_TOO_LARGE', 413).kind, FailureKind.payloadTooLarge);
+    expect(from('INTERNAL_SERVER_ERROR', 500).kind, FailureKind.server);
+  });
 }
